@@ -99,12 +99,10 @@
                     </div>
 
                     <div class="mb-6 flex flex-wrap items-center gap-3">
-                        <form action="{{ route('admin.payrolls.destroy-all') }}" method="POST"
-                            data-confirm
+                        <form action="{{ route('admin.payrolls.destroy-all') }}" method="POST" data-confirm
                             data-confirm-title="Hapus semua payroll?"
                             data-confirm-text="Semua data payroll, PDF slip gaji, dan antrean email payroll akan dihapus permanen."
-                            data-confirm-button="Ya, hapus semua"
-                            data-confirm-cancel="Batal">
+                            data-confirm-button="Ya, hapus semua" data-confirm-cancel="Batal">
 
                             @csrf
                             @method('DELETE')

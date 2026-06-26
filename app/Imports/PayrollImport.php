@@ -2,7 +2,9 @@
 
 namespace App\Imports;
 
+use App\Models\Department;
 use App\Models\Employee;
+use App\Models\Position;
 use App\Services\PayrollService;
 use App\Support\PayrollSlipFormat;
 use Illuminate\Support\Collection;
@@ -64,6 +66,8 @@ class PayrollImport implements
                 continue;
             }
 
+            $this->syncEmployeeOrganization($employee, $row);
+
             $this->payrollService->createPayroll(
                 $employee,
                 $this->payrollData($row)
@@ -115,14 +119,42 @@ class PayrollImport implements
         return $employee;
     }
 
+    protected function syncEmployeeOrganization(Employee $employee, Collection $row): void
+    {
+        $positionName = trim((string) ($row['jabatan'] ?? $row['posisi'] ?? ''));
+        $departmentName = trim((string) ($row['departemen'] ?? $row['department'] ?? ''));
+
+        $positionName = preg_replace('/\s+/', ' ', $positionName);
+        $departmentName = preg_replace('/\s+/', ' ', $departmentName);
+
+        $updates = [];
+
+        if ($positionName !== '') {
+            $updates['position_id'] = Position::firstOrCreate([
+                'name' => $positionName,
+            ])->id;
+        }
+
+        if ($departmentName !== '') {
+            $updates['department_id'] = Department::firstOrCreate([
+                'name' => $departmentName,
+            ])->id;
+        }
+
+        if (! empty($updates)) {
+            $employee->update($updates);
+            $employee->refresh();
+        }
+    }
+
     protected function payrollData(Collection $row): array
     {
         Log::info('PAYROLL IMPORT ROW', $row->toArray());
 
         return [
 
-            'position_name' => trim((string) ($row['jabatan'] ?? '')),
-            'department_name' => trim((string) ($row['departemen'] ?? '')),
+            'position_name' => $this->textValueFromRow($row, ['jabatan', 'posisi']),
+            'department_name' => $this->textValueFromRow($row, ['departemen', 'department']),
 
             'period' => trim((string) $this->valueFromRow(
                 $row,
@@ -229,6 +261,20 @@ class PayrollImport implements
 
             if ($row->has($alias) && $row[$alias] !== null) {
                 return $row[$alias];
+            }
+        }
+
+        return null;
+    }
+
+    protected function textValueFromRow(Collection $row, array $aliases): ?string
+    {
+        foreach ($aliases as $alias) {
+            if ($row->has($alias)) {
+                $value = trim((string) ($row[$alias] ?? ''));
+                $value = preg_replace('/\s+/', ' ', $value);
+
+                return $value !== '' ? $value : '-';
             }
         }
 
