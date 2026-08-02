@@ -1,4 +1,7 @@
-<img width="2880" height="3012" alt="PayrollSystem(2)" src="https://github.com/user-attachments/assets/702ffb2e-09ae-431f-b103-9d4b0b922525" />
+<img width="2880" height="6886" alt="FireShot Capture 005 - PayrollSystem - localhost" src="https://github.com/user-attachments/assets/89442e9b-6a38-4288-b34d-cbdb0c8b98c2" />
+
+<img width="2880" height="4027" alt="FireShot Capture 006 - PayrollSystem - localhost" src="https://github.com/user-attachments/assets/532084d8-1721-46ff-a756-d73205e39a14" />
+
 
 <img width="2880" height="3982" alt="PayrollSystem(1)" src="https://github.com/user-attachments/assets/4d2196e6-a8dd-453f-9f7e-6ee7b6db5b61" />
 
@@ -244,3 +247,13 @@ WHERE e.email IN (
     'kurniasihnia2828@gmail.com'
 );
 ```
+
+###### Clean up users data 
+```
+ php artisan db:seed --class=CleanupEmployeeUsersSeeder
+```
+
+##### Update user admin 
+```
+php artisan db:seed --class=AdminCompanySeeder
+``` 
