@@ -248,6 +248,34 @@ WHERE e.email IN (
 );
 ```
 
+###### Public shared hosting 
+inside public_html root folder : index.php 
+```
+<?php
+
+use Illuminate\Foundation\Application;
+use Illuminate\Http\Request;
+
+define('LARAVEL_START', microtime(true));
+
+if (file_exists($maintenance = __DIR__.'/payroll-system/storage/framework/maintenance.php')) {
+    require $maintenance;
+}
+
+require __DIR__.'/payroll-system/vendor/autoload.php';
+
+/** @var Application $app */
+$app = require_once __DIR__.'/payroll-system/bootstrap/app.php';
+
+if (method_exists($app, 'usePublicPath')) {
+    $app->usePublicPath(__DIR__);
+} else {
+    $app->instance('path.public', __DIR__);
+}
+
+$app->handleRequest(Request::capture());
+```
+
 ###### Clean up users data 
 ```
  php artisan db:seed --class=CleanupEmployeeUsersSeeder
