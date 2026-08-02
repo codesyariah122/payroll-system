@@ -9,9 +9,12 @@ use Maatwebsite\Excel\Concerns\WithHeadings;
 
 class PayrollExport implements FromCollection, WithHeadings
 {
+    public function __construct(protected int $companyId) {}
+
     public function collection()
     {
         return Payroll::with(['employee.department', 'employee.position'])
+            ->where('company_id', $this->companyId)
             ->get()
             ->values()
             ->map(function ($payroll, $index) {

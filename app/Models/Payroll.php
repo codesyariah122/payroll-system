@@ -8,6 +8,7 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
 class Payroll extends Model
 {
     protected $fillable = [
+        'company_id',
         'employee_id',
         'period',
         'target_work_days',
@@ -41,6 +42,9 @@ class Payroll extends Model
         'deduction',
         'total_salary',
         'pdf_path',
+        'email_status',
+        'email_error',
+        'email_sent_at',
     ];
 
     protected $casts = [
@@ -77,5 +81,10 @@ class Payroll extends Model
     public function employee(): BelongsTo
     {
         return $this->belongsTo(Employee::class);
+    }
+
+    public function company(): BelongsTo
+    {
+        return $this->belongsTo(Company::class);
     }
 }

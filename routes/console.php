@@ -4,6 +4,7 @@ use App\Models\Department;
 use App\Models\Employee;
 use App\Models\Payroll;
 use App\Models\Position;
+use App\Support\OrganizationLookup;
 use Illuminate\Foundation\Inspiring;
 use Illuminate\Support\Facades\Artisan;
 use Illuminate\Support\Facades\Storage;
@@ -77,11 +78,11 @@ Artisan::command('payroll:repair-snapshots {file}', function (string $file) {
         $employeeUpdates = [];
 
         if ($positionName !== '' && $positionName !== '-') {
-            $employeeUpdates['position_id'] = Position::firstOrCreate(['name' => $positionName])->id;
+            $employeeUpdates['position_id'] = OrganizationLookup::position($positionName)->id;
         }
 
         if ($departmentName !== '' && $departmentName !== '-') {
-            $employeeUpdates['department_id'] = Department::firstOrCreate(['name' => $departmentName])->id;
+            $employeeUpdates['department_id'] = OrganizationLookup::department($departmentName)->id;
         }
 
         if (! empty($employeeUpdates)) {
@@ -112,3 +113,34 @@ Artisan::command('payroll:repair-snapshots {file}', function (string $file) {
 
     return Command::SUCCESS;
 })->purpose('Repair payroll position and department snapshots from an Excel payroll file');
+
+Artisan::command('organization:merge-duplicates', function () {
+    $mergedDepartments = 0;
+    $mergedPositions = 0;
+
+    Department::orderBy('id')->get()->groupBy(fn (Department $department) => OrganizationLookup::normalizeName($department->name))
+        ->each(function ($departments) use (&$mergedDepartments) {
+            $primary = $departments->first();
+
+            $departments->skip(1)->each(function (Department $duplicate) use ($primary, &$mergedDepartments) {
+                Employee::where('department_id', $duplicate->id)->update(['department_id' => $primary->id]);
+                $duplicate->delete();
+                $mergedDepartments++;
+            });
+        });
+
+    Position::orderBy('id')->get()->groupBy(fn (Position $position) => OrganizationLookup::normalizeName($position->name))
+        ->each(function ($positions) use (&$mergedPositions) {
+            $primary = $positions->first();
+
+            $positions->skip(1)->each(function (Position $duplicate) use ($primary, &$mergedPositions) {
+                Employee::where('position_id', $duplicate->id)->update(['position_id' => $primary->id]);
+                $duplicate->delete();
+                $mergedPositions++;
+            });
+        });
+
+    $this->info("Merge selesai. Department duplikat digabung: {$mergedDepartments}. Posisi duplikat digabung: {$mergedPositions}.");
+
+    return Command::SUCCESS;
+})->purpose('Merge duplicate departments and positions by normalized names');

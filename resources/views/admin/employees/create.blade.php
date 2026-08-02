@@ -6,7 +6,7 @@
     <div class="py-6">
         <div class="mx-auto max-w-4xl sm:px-6 lg:px-8">
             <div class="rounded-xl bg-white dark:bg-gray-800 shadow-sm border border-gray-200 dark:border-gray-700 p-6">
-                <form action="{{ route('admin.employees.store') }}" method="POST">
+                <form action="{{ route('admin.employees.store') }}" method="POST" x-data="{ createUser: {{ old('create_user') ? 'true' : 'false' }} }">
                     @csrf
 
                     <div class="grid gap-6 lg:grid-cols-2">
@@ -57,16 +57,6 @@
                             @enderror
                         </div>
                         <div>
-                            <label class="block text-sm font-medium text-gray-700 dark:text-gray-200">Password
-                                Akun</label>
-                            <input type="password" name="password"
-                                class="mt-2 block w-full rounded-lg border-gray-300 bg-white text-gray-900 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 dark:border-gray-700 dark:bg-gray-900 dark:text-gray-100"
-                                required>
-                            @error('password')
-                                <p class="mt-2 text-sm text-red-600">{{ $message }}</p>
-                            @enderror
-                        </div>
-                        <div>
                             <label class="block text-sm font-medium text-gray-700 dark:text-gray-200">Department</label>
                             <select name="department_id"
                                 class="mt-2 block w-full rounded-lg border-gray-300 bg-white text-gray-900 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 dark:border-gray-700 dark:bg-gray-900 dark:text-gray-100"
@@ -95,6 +85,40 @@
                                 @endforeach
                             </select>
                             @error('position_id')
+                                <p class="mt-2 text-sm text-red-600">{{ $message }}</p>
+                            @enderror
+                        </div>
+                        <div class="lg:col-span-2 rounded-xl border border-indigo-200 bg-indigo-50 p-4 dark:border-indigo-500/20 dark:bg-indigo-500/10">
+                            <label class="flex items-start gap-3">
+                                <input type="checkbox" name="create_user" value="1" x-model="createUser"
+                                    class="mt-1 rounded border-gray-300 text-indigo-600 shadow-sm focus:ring-indigo-500 dark:border-gray-700 dark:bg-gray-900">
+                                <span>
+                                    <span class="block text-sm font-semibold text-gray-800 dark:text-gray-100">Buat akun login untuk karyawan</span>
+                                    <span class="mt-1 block text-sm leading-6 text-gray-600 dark:text-gray-300">
+                                        Default-nya tidak dibuat. Aktifkan hanya jika karyawan memang perlu login ke dashboard.
+                                    </span>
+                                </span>
+                            </label>
+                            @error('create_user')
+                                <p class="mt-2 text-sm text-red-600">{{ $message }}</p>
+                            @enderror
+                        </div>
+                        <div x-show="createUser" style="display: none;">
+                            <label class="block text-sm font-medium text-gray-700 dark:text-gray-200">Password Akun</label>
+                            <input type="password" name="password"
+                                class="mt-2 block w-full rounded-lg border-gray-300 bg-white text-gray-900 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 dark:border-gray-700 dark:bg-gray-900 dark:text-gray-100"
+                                autocomplete="new-password">
+                            <p class="mt-2 text-xs text-gray-500 dark:text-gray-400">Minimal 8 karakter, wajib huruf besar-kecil dan angka.</p>
+                            @error('password')
+                                <p class="mt-2 text-sm text-red-600">{{ $message }}</p>
+                            @enderror
+                        </div>
+                        <div x-show="createUser" style="display: none;">
+                            <label class="block text-sm font-medium text-gray-700 dark:text-gray-200">Konfirmasi Password</label>
+                            <input type="password" name="password_confirmation"
+                                class="mt-2 block w-full rounded-lg border-gray-300 bg-white text-gray-900 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 dark:border-gray-700 dark:bg-gray-900 dark:text-gray-100"
+                                autocomplete="new-password">
+                            @error('password_confirmation')
                                 <p class="mt-2 text-sm text-red-600">{{ $message }}</p>
                             @enderror
                         </div>

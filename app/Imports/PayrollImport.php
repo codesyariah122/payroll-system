@@ -2,10 +2,10 @@
 
 namespace App\Imports;
 
-use App\Models\Department;
+use App\Models\Company;
 use App\Models\Employee;
-use App\Models\Position;
 use App\Services\PayrollService;
+use App\Support\OrganizationLookup;
 use App\Support\PayrollSlipFormat;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Log;
@@ -16,21 +16,42 @@ use Maatwebsite\Excel\Concerns\SkipsOnError;
 use Maatwebsite\Excel\Concerns\SkipsOnFailure;
 use Maatwebsite\Excel\Concerns\ToCollection;
 use Maatwebsite\Excel\Concerns\WithHeadingRow;
-use Maatwebsite\Excel\Concerns\WithValidation;
 use Maatwebsite\Excel\Concerns\WithCalculatedFormulas;
 use Maatwebsite\Excel\Imports\HeadingRowFormatter;
 
 class PayrollImport implements
     ToCollection,
     WithHeadingRow,
-    WithValidation,
     SkipsOnFailure,
     SkipsOnError,
     WithCalculatedFormulas
 {
     use Importable, SkipsFailures, SkipsErrors;
 
-    public function __construct(protected PayrollService $payrollService)
+    protected const EMAIL_ALIASES = ['email', 'e_mail', 'email_karyawan', 'alamat_email'];
+
+    protected const POSITION_ALIASES = ['jabatan', 'posisi', 'position', 'jabatan_posisi'];
+
+    protected const DEPARTMENT_ALIASES = ['departemen', 'department', 'bagian', 'divisi'];
+
+    protected const REQUIRED_HEADERS = [
+        'Email' => self::EMAIL_ALIASES,
+        'Bulan / Periode' => PayrollSlipFormat::IMPORT_ALIASES['period'],
+        'Target Hari Kerja' => PayrollSlipFormat::IMPORT_ALIASES['target_work_days'],
+        'Hari Kerja' => PayrollSlipFormat::IMPORT_ALIASES['work_days'],
+        'Gaji Pokok' => PayrollSlipFormat::IMPORT_ALIASES['basic_salary'],
+        'Total Gaji Bersih / THP' => PayrollSlipFormat::IMPORT_ALIASES['take_home_pay'],
+    ];
+
+    protected int $createdCount = 0;
+
+    protected int $skippedCount = 0;
+
+    protected array $importErrors = [];
+
+    protected array $warnings = [];
+
+    public function __construct(protected PayrollService $payrollService, protected Company $company)
     {
         HeadingRowFormatter::extend('custom', function ($value) {
 
@@ -48,21 +69,34 @@ class PayrollImport implements
 
     public function collection(Collection $rows): void
     {
+        $rows = $rows->filter(fn (Collection $row) => $row->filter()->isNotEmpty())->values();
+
         Log::info('TOTAL ROWS IMPORT', [
             'count' => $rows->count(),
         ]);
 
-        foreach ($rows as $row) {
+        if ($rows->isEmpty()) {
+            $this->importErrors[] = 'File Excel tidak memiliki data payroll.';
+
+            return;
+        }
+
+        $this->validateRequiredHeaders($rows->first());
+
+        if (! empty($this->importErrors)) {
+            return;
+        }
+
+        foreach ($rows as $index => $row) {
 
             Log::info('ROW IMPORT', $row->toArray());
 
-            if ($row->filter()->isEmpty()) {
-                continue;
-            }
-
-            $employee = $this->findEmployee($row);
+            $rowNumber = $index + 2;
+            $employee = $this->findEmployee($row, $rowNumber);
 
             if (! $employee) {
+                $this->skippedCount++;
+
                 continue;
             }
 
@@ -72,30 +106,28 @@ class PayrollImport implements
                 $employee,
                 $this->payrollData($row)
             );
+
+            $this->createdCount++;
         }
     }
 
-    public function rules(): array
+    public function summary(): array
     {
         return [
-            'email' => ['required', 'email'],
-            'bulan' => ['nullable', 'string'],
+            'created' => $this->createdCount,
+            'skipped' => $this->skippedCount,
+            'errors' => $this->importErrors,
+            'warnings' => $this->warnings,
         ];
     }
 
-    public function customValidationMessages(): array
+    protected function findEmployee(Collection $row, int $rowNumber): ?Employee
     {
-        return [
-            'email.required' => 'Kolom email wajib diisi.',
-            'email.email' => 'Format email tidak valid.',
-        ];
-    }
-
-    protected function findEmployee(Collection $row): ?Employee
-    {
-        $email = strtolower(trim((string) ($row['email'] ?? '')));
+        $email = strtolower(trim((string) $this->valueFromRow($row, self::EMAIL_ALIASES)));
 
         if ($email === '') {
+
+            $this->warnings[] = "Baris {$rowNumber}: email kosong, data dilewati.";
 
             Log::warning('EMAIL KOSONG', [
                 'row' => $row->toArray(),
@@ -107,9 +139,13 @@ class PayrollImport implements
         $employee = Employee::whereRaw(
             'LOWER(TRIM(email)) = ?',
             [$email]
-        )->first();
+        )
+            ->where('company_id', $this->company->id)
+            ->first();
 
         if (! $employee) {
+
+            $this->warnings[] = "Baris {$rowNumber}: email {$email} tidak ditemukan di data karyawan.";
 
             Log::warning('EMAIL TIDAK DITEMUKAN', [
                 'email_excel' => $email,
@@ -121,24 +157,20 @@ class PayrollImport implements
 
     protected function syncEmployeeOrganization(Employee $employee, Collection $row): void
     {
-        $positionName = trim((string) ($row['jabatan'] ?? $row['posisi'] ?? ''));
-        $departmentName = trim((string) ($row['departemen'] ?? $row['department'] ?? ''));
+        $positionName = trim((string) $this->valueFromRow($row, self::POSITION_ALIASES));
+        $departmentName = trim((string) $this->valueFromRow($row, self::DEPARTMENT_ALIASES));
 
-        $positionName = preg_replace('/\s+/', ' ', $positionName);
-        $departmentName = preg_replace('/\s+/', ' ', $departmentName);
+        $positionName = OrganizationLookup::cleanName($positionName, '');
+        $departmentName = OrganizationLookup::cleanName($departmentName, '');
 
         $updates = [];
 
         if ($positionName !== '') {
-            $updates['position_id'] = Position::firstOrCreate([
-                'name' => $positionName,
-            ])->id;
+            $updates['position_id'] = OrganizationLookup::position($positionName, $this->company->id)->id;
         }
 
         if ($departmentName !== '') {
-            $updates['department_id'] = Department::firstOrCreate([
-                'name' => $departmentName,
-            ])->id;
+            $updates['department_id'] = OrganizationLookup::department($departmentName, $this->company->id)->id;
         }
 
         if (! empty($updates)) {
@@ -153,8 +185,8 @@ class PayrollImport implements
 
         return [
 
-            'position_name' => $this->textValueFromRow($row, ['jabatan', 'posisi']),
-            'department_name' => $this->textValueFromRow($row, ['departemen', 'department']),
+            'position_name' => $this->textValueFromRow($row, self::POSITION_ALIASES),
+            'department_name' => $this->textValueFromRow($row, self::DEPARTMENT_ALIASES),
 
             'period' => trim((string) $this->valueFromRow(
                 $row,
@@ -265,6 +297,32 @@ class PayrollImport implements
         }
 
         return null;
+    }
+
+    protected function validateRequiredHeaders(Collection $row): void
+    {
+        $headers = $row->keys()->filter(fn ($header) => is_string($header) && $header !== '')->all();
+
+        foreach (self::REQUIRED_HEADERS as $label => $aliases) {
+            if (! $this->hasAnyHeader($headers, $aliases)) {
+                $this->importErrors[] = sprintf(
+                    'Header "%s" tidak ditemukan. Nama yang didukung: %s.',
+                    $label,
+                    implode(', ', $aliases)
+                );
+            }
+        }
+    }
+
+    protected function hasAnyHeader(array $headers, array $aliases): bool
+    {
+        foreach ($aliases as $alias) {
+            if (in_array($alias, $headers, true)) {
+                return true;
+            }
+        }
+
+        return false;
     }
 
     protected function textValueFromRow(Collection $row, array $aliases): ?string

@@ -326,6 +326,13 @@
                                                         Gagal
 
                                                     </span>
+                                                @elseif ($payroll->email_status === 'skipped')
+                                                    <span
+                                                        class="inline-flex items-center whitespace-nowrap rounded-full border border-slate-500/20 bg-slate-500/10 px-3 py-1 text-xs font-semibold text-slate-300">
+
+                                                        Skip Rp 0
+
+                                                    </span>
                                                 @else
                                                     <span
                                                         class="inline-flex items-center whitespace-nowrap rounded-full border border-slate-500/20 bg-slate-500/10 px-3 py-1 text-xs font-semibold text-slate-300">

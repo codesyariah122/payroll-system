@@ -88,16 +88,16 @@ class PayrollSlipFormat
 
     public const IMPORT_ALIASES = [
         'period' => ['bulan', 'period', 'periode'],
-        'target_work_days' => ['target_hk', 'target_work_days'],
-        'work_days' => ['hk', 'work_days'],
+        'target_work_days' => ['target_hk', 'target_hari_kerja', 'target_kerja', 'target_work_days'],
+        'work_days' => ['hk', 'hari_kerja', 'jumlah_hari_kerja', 'work_days'],
         'overtime_hours' => ['jam_lembur', 'overtime_hours'],
         'special_overtime_hours' => ['jam_lembur_khusus', 'special_overtime_hours'],
         'basic_salary' => ['gaji_pokok', 'basic_salary'],
         'position_allowance' => ['tunjangan_jabatan', 'position_allowance'],
-        'attendance_allowance' => ['tunjangan_kehadiran', 'attendance_allowance'],
+        'attendance_allowance' => ['tunjangan_kehadiran', 'tj_kehadiran', 'tunjangan_hadir', 'attendance_allowance'],
         'safety_incentive' => ['insentif_keselamatan', 'safety_incentive'],
-        'risk_allowance' => ['tunjangan_risiko', 'risk_allowance'],
-        'placement_allowance' => ['tunjangan_penempatan', 'placement_allowance'],
+        'risk_allowance' => ['tunjangan_risiko', 'tj_risiko', 'tunjangan_resiko', 'tj_resiko', 'risk_allowance'],
+        'placement_allowance' => ['tunjangan_penempatan', 'tj_penempatan', 'placement_allowance'],
         'golden_shake_hand' => ['golden_shake_hand'],
         'tax_allowance' => ['tunjangan_pph', 'tax_allowance'],
         'irregular_income' => ['bonus_thr_penghasilan_tidak_teratur', 'bonus', 'irregular_income'],
@@ -108,9 +108,9 @@ class PayrollSlipFormat
         'attendance_deduction' => ['potongan_kehadiran_absensiprorate', 'potongan_kehadiran_absensi_prorate', 'attendance_deduction'],
         'fine' => ['denda', 'fine'],
         'employee_receivable' => ['piutang_karyawan', 'employee_receivable'],
-        'pph21_tax_object' => ['objek_pajak_pph_21', 'objek_pajak_pph21', 'pph21_tax_object'],
+        'pph21_tax_object' => ['objek_pajak_pph_21', 'objek_pajak_pph21', 'pph_21', 'pph21', 'pph21_tax_object'],
         'total_deduction' => ['jumlah_potongan', 'deduction', 'total_deduction'],
-        'take_home_pay' => ['thpgaji_bersih', 'thp_gaji_bersih', 'total_salary', 'take_home_pay'],
+        'take_home_pay' => ['thpgaji_bersih', 'thp_gaji_bersih', 'total_gaji_bersih', 'gaji_bersih', 'thp', 'total_salary', 'take_home_pay'],
     ];
 
     public static function headings(): array

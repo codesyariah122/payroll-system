@@ -21,11 +21,13 @@ class PayrollController extends Controller
     public function index(Request $request)
     {
         $search = $request->search;
+        $companyId = $request->user()->company_id;
 
         $payrolls = Payroll::with([
             'employee.department',
             'employee.position'
         ])
+            ->where('company_id', $companyId)
             ->when($search, function ($query) use ($search) {
 
                 $query->where(function ($q) use ($search) {
@@ -60,17 +62,21 @@ class PayrollController extends Controller
         ));
     }
 
-    public function create()
+    public function create(Request $request)
     {
         return view('admin.payrolls.create', [
-            'employees' => Employee::where('status', 'active')->orderBy('name')->get(),
+            'employees' => Employee::where('company_id', $request->user()->company_id)
+                ->where('status', 'active')
+                ->orderBy('name')
+                ->get(),
         ]);
     }
 
     public function store(PayrollRequest $request, PayrollService $payrollService)
     {
         $data = $request->validated();
-        $employee = Employee::findOrFail($data['employee_id']);
+        $employee = Employee::where('company_id', $request->user()->company_id)
+            ->findOrFail($data['employee_id']);
 
         $payroll = $payrollService->createPayrollWithPdf($employee, $data);
 
@@ -82,24 +88,34 @@ class PayrollController extends Controller
             ->with('status', 'Payroll berhasil dibuat dan slip gaji disiapkan.');
     }
 
-    public function show(Payroll $payroll)
+    public function show(Request $request, Payroll $payroll)
     {
+        $this->authorizeCompany($request, $payroll);
+
         $payroll->load(['employee.department', 'employee.position']);
 
         return view('admin.payrolls.show', compact('payroll'));
     }
 
-    public function edit(Payroll $payroll)
+    public function edit(Request $request, Payroll $payroll)
     {
+        $this->authorizeCompany($request, $payroll);
+
         return view('admin.payrolls.edit', [
             'payroll' => $payroll,
-            'employees' => Employee::where('status', 'active')->orderBy('name')->get(),
+            'employees' => Employee::where('company_id', $request->user()->company_id)
+                ->where('status', 'active')
+                ->orderBy('name')
+                ->get(),
         ]);
     }
 
     public function update(PayrollRequest $request, Payroll $payroll, PayrollService $payrollService)
     {
+        $this->authorizeCompany($request, $payroll);
+
         $data = $payrollService->normalizePayrollData($request->validated());
+        Employee::where('company_id', $request->user()->company_id)->findOrFail($data['employee_id']);
 
         $payroll->update([
             'employee_id' => $data['employee_id'],
@@ -145,8 +161,10 @@ class PayrollController extends Controller
             ->with('status', 'Payroll berhasil diperbarui.');
     }
 
-    public function destroy(Payroll $payroll)
+    public function destroy(Request $request, Payroll $payroll)
     {
+        $this->authorizeCompany($request, $payroll);
+
         try {
 
             // hapus file pdf jika ada
@@ -180,27 +198,45 @@ class PayrollController extends Controller
         return view('admin.payrolls.import');
     }
 
-    public function export()
+    public function export(Request $request)
     {
         return Excel::download(
-            new PayrollExport,
+            new PayrollExport($request->user()->company_id),
             'payroll-data.xlsx'
         );
     }
 
     public function importStore(PayrollImportRequest $request, PayrollService $payrollService)
     {
-        Excel::import(new PayrollImport($payrollService), $request->file('file'));
+        $import = new PayrollImport($payrollService, $request->user()->company);
+
+        Excel::import($import, $request->file('file'));
+
+        $summary = $import->summary();
+
+        if (! empty($summary['errors'])) {
+            return back()
+                ->with('error', 'Import payroll dibatalkan. ' . implode(' ', $summary['errors']));
+        }
+
+        $message = "Data payroll berhasil diimpor: {$summary['created']} data dibuat.";
+
+        if ($summary['skipped'] > 0) {
+            $message .= " {$summary['skipped']} baris dilewati karena email tidak cocok/kosong.";
+        }
 
         return redirect()->route('admin.payrolls.index')
-            ->with('status', 'Data payroll berhasil diimpor.');
+            ->with('status', $message);
     }
 
     public function sendBulk(Request $request)
     {
+        $companyId = $request->user()->company_id;
+
         if ($request->boolean('send_all')) {
 
-            $query = Payroll::with('employee')
+            $baseQuery = Payroll::with('employee')
+                ->where('company_id', $companyId)
                 ->where(function ($q) {
                     $q->whereNull('email_status')
                         ->orWhereIn('email_status', [
@@ -218,7 +254,8 @@ class PayrollController extends Controller
                     ->with('status', 'Silakan pilih minimal satu payroll untuk dikirim.');
             }
 
-            $query = Payroll::with('employee')
+            $baseQuery = Payroll::with('employee')
+                ->where('company_id', $companyId)
                 ->whereIn('id', $ids)
                 ->where(function ($q) {
                     $q->whereNull('email_status')
@@ -229,12 +266,70 @@ class PayrollController extends Controller
                 });
         }
 
+        $skippedZeroCount = (clone $baseQuery)
+            ->where('take_home_pay', '<=', 0)
+            ->count();
+
+        if ($skippedZeroCount > 0) {
+            (clone $baseQuery)
+                ->where('take_home_pay', '<=', 0)
+                ->update([
+                    'email_status' => 'skipped',
+                    'email_error' => 'Total gaji bersih 0, email tidak dikirim.',
+                ]);
+        }
+
+        $query = (clone $baseQuery)
+            ->where('take_home_pay', '>', 0);
+
         $payrollCount = $query->count();
 
         if ($payrollCount === 0) {
+            $message = 'Data payroll tidak ditemukan untuk dikirim.';
+
+            if ($skippedZeroCount > 0) {
+                $message = "{$skippedZeroCount} payroll dilewati karena total gaji bersih 0. Tidak ada email yang dimasukkan ke antrean.";
+            }
 
             return redirect()->route('admin.payrolls.index')
-                ->with('status', 'Data payroll tidak ditemukan untuk dikirim.');
+                ->with('status', $message);
+        }
+
+        if ($this->shouldUseLocalPayrollEmailTest()) {
+            $testEmail = (string) config('payroll.local_email_test.recipient');
+
+            if (! filter_var($testEmail, FILTER_VALIDATE_EMAIL)) {
+                return redirect()->route('admin.payrolls.index')
+                    ->with('error', 'Email testing payroll lokal tidak valid.');
+            }
+
+            $samplePayroll = (clone $query)->first();
+
+            $samplePayroll->update([
+                'email_status' => 'queued',
+                'email_error' => null,
+                'email_sent_at' => null,
+            ]);
+
+            SendPayrollSlipEmailJob::dispatch($samplePayroll, $testEmail);
+
+            (clone $query)
+                ->where('id', '!=', $samplePayroll->id)
+                ->update([
+                    'email_status' => 'sent',
+                    'email_error' => 'Local test mode: dianggap terkirim tanpa mengirim email.',
+                    'email_sent_at' => now(),
+                ]);
+
+            $simulatedCount = max($payrollCount - 1, 0);
+            $message = "Mode testing local aktif: 1 slip payroll dimasukkan ke antrean untuk {$testEmail}. {$simulatedCount} payroll lain ditandai terkirim tanpa kirim email.";
+
+            if ($skippedZeroCount > 0) {
+                $message .= " {$skippedZeroCount} payroll nominal 0 dilewati.";
+            }
+
+            return redirect()->route('admin.payrolls.index')
+                ->with('status', $message);
         }
 
         $delay = 0;
@@ -266,18 +361,29 @@ class PayrollController extends Controller
             }
         });
 
+        $message = "Email slip gaji untuk {$payrollCount} payroll telah dimasukkan ke antrean.";
+
+        if ($skippedZeroCount > 0) {
+            $message .= " {$skippedZeroCount} payroll nominal 0 dilewati.";
+        }
+
         return redirect()->route('admin.payrolls.index')
-            ->with(
-                'status',
-                "Email slip gaji untuk {$payrollCount} payroll telah dimasukkan ke antrean."
-            );
+            ->with('status', $message);
+    }
+
+    protected function shouldUseLocalPayrollEmailTest(): bool
+    {
+        return app()->environment('local')
+            && (bool) config('payroll.local_email_test.enabled');
     }
 
     public function preview(Request $request, Payroll $payroll, PayrollService $payrollService)
     {
         $user = $request->user();
 
-        if (! $user->isAdmin() && $user->employee?->id !== $payroll->employee_id) {
+        if ($user->isAdmin()) {
+            $this->authorizeCompany($request, $payroll);
+        } elseif ($user->employee?->id !== $payroll->employee_id) {
             abort(403);
         }
 
@@ -324,7 +430,9 @@ class PayrollController extends Controller
     {
         $user = $request->user();
 
-        if (! $user->isAdmin() && $user->employee?->id !== $payroll->employee_id) {
+        if ($user->isAdmin()) {
+            $this->authorizeCompany($request, $payroll);
+        } elseif ($user->employee?->id !== $payroll->employee_id) {
             abort(403);
         }
 
@@ -341,28 +449,21 @@ class PayrollController extends Controller
         );
     }
 
-    public function destroyAll()
+    public function destroyAll(Request $request)
     {
         try {
-            $payrollCount = Payroll::count();
+            $companyId = $request->user()->company_id;
+            $payrollCount = Payroll::where('company_id', $companyId)->count();
 
             DB::beginTransaction();
 
-            $deletedJobs = DB::table('jobs')
-                ->where('payload', 'like', '%SendPayrollSlipEmailJob%')
-                ->orWhere('payload', 'like', '%GeneratePayrollPdfJob%')
-                ->delete();
+            $deletedJobs = 0;
 
-            DB::table('failed_jobs')
-                ->where('payload', 'like', '%SendPayrollSlipEmailJob%')
-                ->orWhere('payload', 'like', '%GeneratePayrollPdfJob%')
-                ->delete();
-
-            Payroll::query()->delete();
+            Payroll::where('company_id', $companyId)->delete();
 
             DB::commit();
 
-            Storage::disk('local')->deleteDirectory('payroll-slips');
+            Storage::disk('local')->deleteDirectory("payroll-slips/company-{$companyId}");
 
             return redirect()
                 ->route('admin.payrolls.index')
@@ -384,5 +485,10 @@ class PayrollController extends Controller
                 ->route('admin.payrolls.index')
                 ->with('error', $e->getMessage());
         }
+    }
+
+    private function authorizeCompany(Request $request, Payroll $payroll): void
+    {
+        abort_if($payroll->company_id !== $request->user()->company_id, 404);
     }
 }

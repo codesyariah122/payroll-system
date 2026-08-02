@@ -4,6 +4,7 @@ namespace Database\Seeders;
 
 use App\Models\Department;
 use App\Models\Employee;
+use App\Models\Company;
 use App\Models\Position;
 use App\Models\User;
 use Faker\Factory as Faker;
@@ -15,8 +16,9 @@ class EmployeeSeeder extends Seeder
     public function run(): void
     {
         $faker = Faker::create('id_ID');
-        $departments = Department::all();
-        $positions = Position::all();
+        $company = Company::firstOrCreate(['name' => 'PT. Citarasa Kuliner Indonesia']);
+        $departments = Department::where('company_id', $company->id)->get();
+        $positions = Position::where('company_id', $company->id)->get();
 
         if ($departments->isEmpty() || $positions->isEmpty()) {
             return;
@@ -36,7 +38,7 @@ class EmployeeSeeder extends Seeder
             'position_id' => $positions->random()->id,
         ];
 
-        $this->createEmployee($special);
+        $this->createEmployee($special, $company->id);
 
         for ($i = 2; $i <= 20; $i++) {
             $data = [
@@ -53,24 +55,26 @@ class EmployeeSeeder extends Seeder
                 'position_id' => $positions->random()->id,
             ];
 
-            $this->createEmployee($data);
+            $this->createEmployee($data, $company->id);
         }
     }
 
-    protected function createEmployee(array $data): void
+    protected function createEmployee(array $data, int $companyId): void
     {
-        $user = User::firstOrCreate([
+        $user = User::updateOrCreate([
             'email' => $data['email'],
         ], [
+            'company_id' => $companyId,
             'name' => $data['name'],
             'email_verified_at' => now(),
             'password' => Hash::make('password'),
             'role' => 'employee',
         ]);
 
-        Employee::firstOrCreate([
+        Employee::updateOrCreate([
             'email' => $data['email'],
         ], [
+            'company_id' => $companyId,
             'user_id' => $user->id,
             'department_id' => $data['department_id'],
             'position_id' => $data['position_id'],

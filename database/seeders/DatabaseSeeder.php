@@ -2,11 +2,9 @@
 
 namespace Database\Seeders;
 
-use App\Models\User;
 use Database\Seeders\EmployeeSeeder;
 use Illuminate\Database\Console\Seeds\WithoutModelEvents;
 use Illuminate\Database\Seeder;
-use Illuminate\Support\Facades\Hash;
 
 class DatabaseSeeder extends Seeder
 {
@@ -17,16 +15,8 @@ class DatabaseSeeder extends Seeder
      */
     public function run(): void
     {
-        User::firstOrCreate([
-            'email' => 'admin@example.com',
-        ], [
-            'name' => 'Administrator',
-            'email_verified_at' => now(),
-            'password' => Hash::make('password'),
-            'role' => 'admin',
-        ]);
-
         $this->call([
+            AdminCompanySeeder::class,
             DepartmentSeeder::class,
             PositionSeeder::class,
             EmployeeSeeder::class,

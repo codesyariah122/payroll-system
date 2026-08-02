@@ -2,12 +2,13 @@
 
 namespace App\Imports;
 
+use App\Models\Company;
 use App\Models\Department;
 use App\Models\Employee;
 use App\Models\Position;
-use App\Models\User;
+use App\Support\OrganizationLookup;
 use Illuminate\Support\Collection;
-use Illuminate\Support\Facades\Hash;
+use Maatwebsite\Excel\Imports\HeadingRowFormatter;
 use Maatwebsite\Excel\Concerns\Importable;
 use Maatwebsite\Excel\Concerns\SkipsErrors;
 use Maatwebsite\Excel\Concerns\SkipsFailures;
@@ -20,101 +21,203 @@ class EmployeeImport implements ToCollection, WithHeadingRow, SkipsOnFailure, Sk
 {
     use Importable, SkipsFailures, SkipsErrors;
 
+    protected const EMAIL_ALIASES = ['email', 'e_mail', 'email_karyawan', 'alamat_email'];
+
+    protected const NAME_ALIASES = ['nama', 'name', 'nama_karyawan', 'employee_name'];
+
+    protected const DEPARTMENT_ALIASES = ['departemen', 'department', 'bagian', 'divisi'];
+
+    protected const POSITION_ALIASES = ['jabatan', 'posisi', 'position', 'jabatan_posisi'];
+
+    protected const NIP_ALIASES = ['nip', 'no_induk', 'employee_id'];
+
+    protected const BASIC_SALARY_ALIASES = ['gaji_pokok', 'basic_salary'];
+
+    protected const ALLOWANCE_ALIASES = ['tunjangan_jabatan', 'allowance'];
+
+    protected const PHONE_ALIASES = ['phone', 'telepon', 'no_hp', 'nomor_hp'];
+
+    protected const ADDRESS_ALIASES = ['address', 'alamat'];
+
+    protected const JOIN_DATE_ALIASES = ['join_date', 'tanggal_masuk', 'tgl_masuk'];
+
+    protected const STATUS_ALIASES = ['status'];
+
+    protected array $departmentCache = [];
+
+    protected array $positionCache = [];
+
+    protected array $usedNips = [];
+
+    protected int $importedCount = 0;
+
+    protected int $skippedCount = 0;
+
+    public function __construct(protected Company $company)
+    {
+        HeadingRowFormatter::extend('custom', function ($value) {
+            $value = strtolower(trim((string) $value));
+            $value = preg_replace('/[^a-z0-9]+/', '_', $value);
+
+            return trim($value, '_');
+        });
+
+        HeadingRowFormatter::default('custom');
+
+        $this->usedNips = Employee::where('company_id', $this->company->id)
+            ->whereNotNull('nip')
+            ->pluck('nip')
+            ->filter()
+            ->flip()
+            ->all();
+    }
+
     public function collection(Collection $rows): void
     {
-        foreach ($rows as $row) {
+        foreach ($rows->filter(fn (Collection $row) => $row->filter()->isNotEmpty()) as $row) {
 
-            if ($row->filter()->isEmpty()) {
-                continue;
-            }
-
-            $email = strtolower(trim($row['email'] ?? ''));
+            $email = strtolower(trim((string) $this->valueFromRow($row, self::EMAIL_ALIASES)));
 
             if (empty($email)) {
+                $this->skippedCount++;
+
                 continue;
             }
 
-            $name = trim($row['nama'] ?? 'Unknown');
+            if (Employee::where('email', $email)->where('company_id', '!=', $this->company->id)->exists()) {
+                $this->skippedCount++;
 
-            $departmentName = trim($row['departemen'] ?? 'General');
-            $positionName   = trim($row['jabatan'] ?? $row['posisi'] ?? 'Staff');
-
-            // rapikan spasi berlebih
-            $departmentName = preg_replace('/\s+/', ' ', $departmentName);
-            $positionName   = preg_replace('/\s+/', ' ', $positionName);
-
-            // DEPARTMENT
-            $department = Department::firstOrCreate([
-                'name' => $departmentName,
-            ]);
-
-            // POSITION
-            $position = Position::firstOrCreate([
-                'name' => $positionName,
-            ]);
-
-            // USER
-            $user = User::firstOrNew([
-                'email' => $email,
-            ]);
-
-            $user->name = $name;
-            $user->email = $email;
-            $user->role = 'employee';
-
-            if (! $user->exists) {
-                $user->password = Hash::make('password');
+                continue;
             }
 
-            $user->save();
+            $name = trim((string) ($this->valueFromRow($row, self::NAME_ALIASES) ?: 'Unknown'));
 
-            // EMPLOYEE
-            $employee = Employee::firstOrNew([
-                'email' => $email,
-            ]);
+            $departmentName = trim((string) ($this->valueFromRow($row, self::DEPARTMENT_ALIASES) ?: 'General'));
+            $positionName = trim((string) ($this->valueFromRow($row, self::POSITION_ALIASES) ?: 'Staff'));
 
-            // hanya saat employee baru
+            $departmentName = OrganizationLookup::cleanName($departmentName, 'General');
+            $positionName = OrganizationLookup::cleanName($positionName, 'Staff');
+
+            $department = $this->department($departmentName);
+            $position = $this->position($positionName);
+
+            $employee = Employee::where('company_id', $this->company->id)
+                ->where('email', $email)
+                ->first();
+
+            if (! $employee && Employee::where('email', $email)->exists()) {
+                $this->skippedCount++;
+
+                continue;
+            }
+
+            $employee ??= new Employee(['email' => $email]);
+
             if (! $employee->exists) {
+                $nip = trim((string) $this->valueFromRow($row, self::NIP_ALIASES));
 
-                $nip = trim((string) ($row['nip'] ?? ''));
-
-                $employee->nip = $nip !== '' && ! Employee::where('nip', $nip)->exists()
-                    ? $nip
+                $employee->nip = $nip !== '' && ! isset($this->usedNips[$nip])
+                    ? $this->rememberNip($nip)
                     : $this->generateUniqueNip();
 
-                $employee->phone = '';
-                $employee->address = '';
-
-                $employee->join_date = now()->format('Y-m-d');
+                $employee->join_date = $this->dateValue($this->valueFromRow($row, self::JOIN_DATE_ALIASES))
+                    ?: now()->format('Y-m-d');
             }
 
-            $employee->user_id = $user->id;
-
+            $employee->company_id = $this->company->id;
+            $employee->user_id ??= null;
             $employee->department_id = $department->id;
             $employee->position_id = $position->id;
-
             $employee->name = $name;
             $employee->email = $email;
+            $employee->phone = trim((string) ($this->valueFromRow($row, self::PHONE_ALIASES) ?? $employee->phone ?? ''));
+            $employee->address = trim((string) ($this->valueFromRow($row, self::ADDRESS_ALIASES) ?? $employee->address ?? ''));
 
-            // update salary hanya jika kolom excel terisi
-            if (
-                isset($row['gaji_pokok']) &&
-                $row['gaji_pokok'] !== ''
-            ) {
-                $employee->basic_salary = floatval($row['gaji_pokok']);
+            $basicSalary = $this->valueFromRow($row, self::BASIC_SALARY_ALIASES);
+            if ($basicSalary !== null && $basicSalary !== '') {
+                $employee->basic_salary = $this->numberValue($basicSalary);
             }
 
-            if (
-                isset($row['tunjangan_jabatan']) &&
-                $row['tunjangan_jabatan'] !== ''
-            ) {
-                $employee->allowance = floatval($row['tunjangan_jabatan']);
+            $allowance = $this->valueFromRow($row, self::ALLOWANCE_ALIASES);
+            if ($allowance !== null && $allowance !== '') {
+                $employee->allowance = $this->numberValue($allowance);
             }
 
-            $employee->status = 'active';
+            $status = strtolower(trim((string) ($this->valueFromRow($row, self::STATUS_ALIASES) ?: 'active')));
+            $employee->status = in_array($status, ['active', 'inactive'], true) ? $status : 'active';
 
             $employee->save();
+            $this->importedCount++;
         }
+    }
+
+    public function summary(): array
+    {
+        return [
+            'imported' => $this->importedCount,
+            'skipped' => $this->skippedCount,
+        ];
+    }
+
+    protected function department(string $name): Department
+    {
+        $key = OrganizationLookup::normalizeName($name);
+
+        return $this->departmentCache[$key] ??= OrganizationLookup::department($name, $this->company->id);
+    }
+
+    protected function position(string $name): Position
+    {
+        $key = OrganizationLookup::normalizeName($name);
+
+        return $this->positionCache[$key] ??= OrganizationLookup::position($name, $this->company->id);
+    }
+
+    protected function valueFromRow(Collection $row, array $aliases): mixed
+    {
+        foreach ($aliases as $alias) {
+            if ($row->has($alias) && $row[$alias] !== null) {
+                return $row[$alias];
+            }
+        }
+
+        return null;
+    }
+
+    protected function numberValue(mixed $value): float
+    {
+        if (is_numeric($value)) {
+            return (float) $value;
+        }
+
+        $value = preg_replace('/[^0-9,.-]/', '', (string) $value);
+
+        if (str_contains($value, ',') && str_contains($value, '.')) {
+            $value = str_replace('.', '', $value);
+            $value = str_replace(',', '.', $value);
+        } elseif (str_contains($value, ',')) {
+            $value = str_replace(',', '.', $value);
+        }
+
+        return is_numeric($value) ? (float) $value : 0;
+    }
+
+    protected function dateValue(mixed $value): ?string
+    {
+        if ($value instanceof \DateTimeInterface) {
+            return $value->format('Y-m-d');
+        }
+
+        $value = trim((string) $value);
+
+        return $value !== '' ? $value : null;
+    }
+
+    private function rememberNip(string $nip): string
+    {
+        $this->usedNips[$nip] = true;
+
+        return $nip;
     }
 
     private function generateUniqueNip(): string
@@ -127,10 +230,8 @@ class EmployeeImport implements ToCollection, WithHeadingRow, SkipsOnFailure, Sk
                 '0',
                 STR_PAD_LEFT
             );
-        } while (
-            Employee::where('nip', $nip)->exists()
-        );
+        } while (isset($this->usedNips[$nip]));
 
-        return $nip;
+        return $this->rememberNip($nip);
     }
 }

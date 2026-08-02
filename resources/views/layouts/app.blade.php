@@ -25,6 +25,8 @@
 </head>
 
 <body class="font-sans antialiased">
+    @php($company = Auth::user()?->company)
+
     <div x-data="{ sidebarCollapsed: false }" :class="sidebarCollapsed ? 'sidebar-collapsed' : ''"
         class="min-h-screen bg-gray-100 dark:bg-gray-900">
         @include('layouts.navigation')
@@ -44,12 +46,17 @@
 
 
                                 <div x-show="!sidebarCollapsed" class="transition-all">
+                                    @if ($company?->logo_path)
+                                        <img src="{{ asset($company->logo_path) }}" alt="{{ $company->name }}"
+                                            class="mb-4 h-12 w-auto max-w-40 object-contain">
+                                    @endif
+
                                     <h2 class="text-lg font-semibold text-white">
-                                        {{ config('app.name', 'Payroll') }}
+                                        {{ $company?->name ?? config('app.name', 'Payroll') }}
                                     </h2>
 
                                     <p class="mt-1 text-sm text-slate-400">
-                                        Akses cepat ke fitur payroll dan karyawan.
+                                        {{ $company?->description ?: 'Akses cepat ke fitur payroll dan karyawan.' }}
                                     </p>
                                 </div>
 
@@ -169,6 +176,24 @@
                                     </svg>
                                 </span>
                                 <span x-show="!sidebarCollapsed">{{ __('Payroll') }}</span>
+                            </a>
+                            <a href="{{ route('admin.payroll-templates.index') }}"
+                                class="flex items-center rounded-3xl px-4 py-3 text-sm font-semibold transition {{ request()->routeIs('admin.payroll-templates.*') ? 'bg-indigo-600 text-white shadow-lg' : 'text-slate-200 hover:bg-slate-800/80 hover:text-white' }}"
+                                :class="sidebarCollapsed ? 'justify-center px-2' : ''">
+                                <span
+                                    class="inline-flex items-center justify-center shrink-0
+    w-11 h-11 rounded-2xl
+    text-indigo-400 bg-indigo-500/10
+    ring-1 ring-indigo-500/20
+    transition-all duration-200"
+                                    :class="sidebarCollapsed ? 'mx-auto' : 'mr-3'">
+                                    <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" viewBox="0 0 24 24"
+                                        fill="none" stroke="currentColor">
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                                            d="M7 3h7l5 5v13H7V3zM14 3v5h5M5 7H3v14h10v-2" />
+                                    </svg>
+                                </span>
+                                <span x-show="!sidebarCollapsed">{{ __('Template Slip') }}</span>
                             </a>
                             {{-- <a href="{{ route('admin.payrolls.import') }}"
                                 class="flex items-center rounded-3xl px-4 py-3 text-sm font-semibold transition {{ request()->routeIs('admin.payrolls.import') ? 'bg-indigo-600 text-white shadow-lg' : 'text-slate-200 hover:bg-slate-800/80 hover:text-white' }}"

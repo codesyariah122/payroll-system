@@ -64,6 +64,82 @@
     <div class="py-8">
         <div class="mx-auto max-w-7xl space-y-8 sm:px-6 lg:px-8">
 
+            @if ($company)
+                <section
+                    class="rounded-3xl border border-white/10 bg-slate-900/80 p-6 shadow-2xl backdrop-blur-xl">
+                    <div class="flex flex-col gap-6 lg:flex-row lg:items-start lg:justify-between">
+                        <div class="flex min-w-0 items-start gap-4">
+                            <div
+                                class="flex h-16 w-16 shrink-0 items-center justify-center overflow-hidden rounded-2xl border border-white/10 bg-slate-950/70">
+                                @if ($company->logo_path)
+                                    <img src="{{ asset($company->logo_path) }}" alt="{{ $company->name }}"
+                                        class="h-full w-full object-contain p-2">
+                                @else
+                                    <span class="text-sm font-bold uppercase text-indigo-300">
+                                        {{ strtoupper(substr($company->name, 0, 2)) }}
+                                    </span>
+                                @endif
+                            </div>
+
+                            <div class="min-w-0">
+                                <p class="text-xs font-semibold uppercase tracking-[0.35em] text-emerald-300">
+                                    Profil Perusahaan
+                                </p>
+
+                                <h2 class="mt-2 truncate text-2xl font-bold text-white">
+                                    {{ $company->name }}
+                                </h2>
+
+                                @if ($company->description)
+                                    <p class="mt-2 max-w-3xl text-sm leading-relaxed text-slate-300">
+                                        {{ $company->description }}
+                                    </p>
+                                @endif
+                            </div>
+                        </div>
+
+                        <div class="grid gap-3 text-sm text-slate-300 sm:grid-cols-2 lg:w-[480px]">
+                            @if ($company->email)
+                                <div class="rounded-2xl border border-white/5 bg-white/[0.03] px-4 py-3">
+                                    <p class="text-xs uppercase tracking-wider text-slate-500">Email</p>
+                                    <p class="mt-1 truncate font-medium text-white">{{ $company->email }}</p>
+                                </div>
+                            @endif
+
+                            @if ($company->phone)
+                                <div class="rounded-2xl border border-white/5 bg-white/[0.03] px-4 py-3">
+                                    <p class="text-xs uppercase tracking-wider text-slate-500">Telepon</p>
+                                    <p class="mt-1 truncate font-medium text-white">{{ $company->phone }}</p>
+                                </div>
+                            @endif
+
+                            @if ($company->city || $company->province)
+                                <div class="rounded-2xl border border-white/5 bg-white/[0.03] px-4 py-3">
+                                    <p class="text-xs uppercase tracking-wider text-slate-500">Domisili</p>
+                                    <p class="mt-1 truncate font-medium text-white">
+                                        {{ collect([$company->city, $company->province])->filter()->join(', ') }}
+                                    </p>
+                                </div>
+                            @endif
+
+                            @if ($company->website)
+                                <div class="rounded-2xl border border-white/5 bg-white/[0.03] px-4 py-3">
+                                    <p class="text-xs uppercase tracking-wider text-slate-500">Website</p>
+                                    <p class="mt-1 truncate font-medium text-white">{{ $company->website }}</p>
+                                </div>
+                            @endif
+                        </div>
+                    </div>
+
+                    @if ($company->address)
+                        <div class="mt-5 rounded-2xl border border-white/5 bg-white/[0.03] px-4 py-3">
+                            <p class="text-xs uppercase tracking-wider text-slate-500">Alamat</p>
+                            <p class="mt-1 text-sm leading-relaxed text-slate-200">{{ $company->address }}</p>
+                        </div>
+                    @endif
+                </section>
+            @endif
+
             <!-- KPI -->
             <div class="grid gap-6 lg:grid-cols-3">
 
@@ -175,6 +251,246 @@
                     </div>
                 </div>
             </div>
+
+            @php
+                $analysisTotal = max($payrollAnalysis['total_payrolls'], 1);
+                $salaryPieStops = [];
+                $salaryStart = 0;
+
+                foreach ($payrollAnalysis['salary_bands'] as $band) {
+                    $slice = ($band['count'] / $analysisTotal) * 100;
+                    $salaryEnd = $salaryStart + $slice;
+                    $salaryPieStops[] = "{$band['color']} {$salaryStart}% {$salaryEnd}%";
+                    $salaryStart = $salaryEnd;
+                }
+
+                $salaryPie = $payrollAnalysis['total_payrolls'] > 0
+                    ? implode(', ', $salaryPieStops)
+                    : '#1e293b 0% 100%';
+
+                $statusColors = [
+                    'sent' => '#34d399',
+                    'failed' => '#fb7185',
+                    'skipped' => '#94a3b8',
+                    'queued' => '#facc15',
+                    'pending' => '#818cf8',
+                ];
+                $statusPieStops = [];
+                $statusStart = 0;
+
+                foreach ($payrollAnalysis['email_statuses'] as $status) {
+                    $slice = ($status['count'] / $analysisTotal) * 100;
+                    $statusEnd = $statusStart + $slice;
+                    $color = $statusColors[$status['status']] ?? '#818cf8';
+                    $statusPieStops[] = "{$color} {$statusStart}% {$statusEnd}%";
+                    $statusStart = $statusEnd;
+                }
+
+                $statusPie = $payrollAnalysis['total_payrolls'] > 0
+                    ? implode(', ', $statusPieStops)
+                    : '#1e293b 0% 100%';
+
+                $complianceTotal = max(array_sum($payrollAnalysis['workday_compliance']), 1);
+                $departmentMax = max($payrollAnalysis['department_payroll']->max('total') ?: 0, 1);
+                $monthlyMax = max($monthlyPayroll->max('total') ?: 0, 1);
+            @endphp
+
+            <section class="grid gap-6 xl:grid-cols-3">
+                <div class="rounded-3xl border border-white/10 bg-slate-900/80 p-6 shadow-2xl backdrop-blur-xl">
+                    <p class="text-sm text-slate-400">Rata-rata Gaji Bersih</p>
+                    <h3 class="mt-4 text-3xl font-bold text-white">
+                        Rp {{ number_format($payrollAnalysis['average_salary'], 0, ',', '.') }}
+                    </h3>
+                    <p class="mt-3 text-xs text-emerald-300">
+                        Berdasarkan {{ $payrollAnalysis['total_payrolls'] }} payroll {{ $latestPeriod ? "periode {$latestPeriod}" : 'terbaru' }}.
+                    </p>
+                </div>
+
+                <div class="rounded-3xl border border-white/10 bg-slate-900/80 p-6 shadow-2xl backdrop-blur-xl">
+                    <p class="text-sm text-slate-400">Realisasi Hari Kerja</p>
+                    <div class="mt-4 flex items-end justify-between gap-4">
+                        <h3 class="text-3xl font-bold text-white">{{ $payrollAnalysis['workday_rate'] }}%</h3>
+                        <p class="text-right text-xs text-slate-400">
+                            {{ number_format($payrollAnalysis['total_work_days'], 0, ',', '.') }} /
+                            {{ number_format($payrollAnalysis['total_target_work_days'], 0, ',', '.') }} hari
+                        </p>
+                    </div>
+                    <div class="mt-5 h-3 overflow-hidden rounded-full bg-slate-800">
+                        <div class="h-full rounded-full bg-gradient-to-r from-cyan-400 to-emerald-400"
+                            style="width: {{ $payrollAnalysis['workday_rate'] }}%"></div>
+                    </div>
+                </div>
+
+                <div class="rounded-3xl border border-white/10 bg-slate-900/80 p-6 shadow-2xl backdrop-blur-xl">
+                    <p class="text-sm text-slate-400">Total Jam Lembur</p>
+                    <h3 class="mt-4 text-3xl font-bold text-white">
+                        {{ number_format($payrollAnalysis['total_overtime_hours'], 1, ',', '.') }} jam
+                    </h3>
+                    <p class="mt-3 text-xs text-purple-300">
+                        Rata-rata {{ number_format($payrollAnalysis['average_overtime_hours'], 1, ',', '.') }} jam per payroll.
+                    </p>
+                </div>
+            </section>
+
+            <section class="grid gap-6 xl:grid-cols-5">
+                <div class="rounded-3xl border border-white/10 bg-slate-900/80 p-6 shadow-2xl backdrop-blur-xl xl:col-span-2">
+                    <div class="mb-6">
+                        <h3 class="text-xl font-semibold text-white">Distribusi Gaji</h3>
+                        <p class="mt-1 text-sm text-slate-400">Sebaran take home pay karyawan pada periode terbaru.</p>
+                    </div>
+
+                    <div class="flex flex-col items-center gap-6 sm:flex-row">
+                        <div class="relative h-44 w-44 shrink-0 rounded-full"
+                            style="background: conic-gradient({{ $salaryPie }});">
+                            <div class="absolute inset-8 rounded-full border border-white/10 bg-slate-950/95"></div>
+                            <div class="absolute inset-0 flex items-center justify-center text-center">
+                                <div>
+                                    <p class="text-2xl font-bold text-white">{{ $payrollAnalysis['total_payrolls'] }}</p>
+                                    <p class="text-xs text-slate-400">Payroll</p>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="w-full space-y-3">
+                            @foreach ($payrollAnalysis['salary_bands'] as $band)
+                                @php($percentage = $payrollAnalysis['total_payrolls'] > 0 ? round(($band['count'] / $analysisTotal) * 100) : 0)
+                                <div>
+                                    <div class="mb-1 flex items-center justify-between gap-3 text-sm">
+                                        <span class="flex items-center gap-2 text-slate-300">
+                                            <span class="h-2.5 w-2.5 rounded-full" style="background-color: {{ $band['color'] }}"></span>
+                                            {{ $band['label'] }}
+                                        </span>
+                                        <span class="font-semibold text-white">{{ $band['count'] }} <span class="text-slate-500">({{ $percentage }}%)</span></span>
+                                    </div>
+                                    <div class="h-2 overflow-hidden rounded-full bg-slate-800">
+                                        <div class="h-full rounded-full" style="width: {{ $percentage }}%; background-color: {{ $band['color'] }}"></div>
+                                    </div>
+                                </div>
+                            @endforeach
+                        </div>
+                    </div>
+                </div>
+
+                <div class="rounded-3xl border border-white/10 bg-slate-900/80 p-6 shadow-2xl backdrop-blur-xl xl:col-span-3">
+                    <div class="mb-6 flex items-center justify-between gap-4">
+                        <div>
+                            <h3 class="text-xl font-semibold text-white">Payroll per Departemen</h3>
+                            <p class="mt-1 text-sm text-slate-400">Area biaya payroll terbesar untuk bahan evaluasi HC.</p>
+                        </div>
+                        <span class="rounded-2xl bg-cyan-500/10 px-4 py-2 text-xs font-medium text-cyan-300">
+                            Top 5
+                        </span>
+                    </div>
+
+                    <div class="space-y-4">
+                        @forelse ($payrollAnalysis['department_payroll'] as $department)
+                            @php($width = round(($department['total'] / $departmentMax) * 100, 1))
+                            <div class="rounded-2xl border border-white/5 bg-white/[0.03] p-4">
+                                <div class="mb-3 flex items-center justify-between gap-4">
+                                    <div class="min-w-0">
+                                        <p class="truncate font-semibold text-white">{{ $department['name'] }}</p>
+                                        <p class="mt-1 text-xs text-slate-500">{{ $department['count'] }} payroll</p>
+                                    </div>
+                                    <p class="shrink-0 text-sm font-bold text-emerald-300">
+                                        Rp {{ number_format($department['total'], 0, ',', '.') }}
+                                    </p>
+                                </div>
+                                <div class="h-3 overflow-hidden rounded-full bg-slate-800">
+                                    <div class="h-full rounded-full bg-gradient-to-r from-cyan-400 to-indigo-400"
+                                        style="width: {{ $width }}%"></div>
+                                </div>
+                            </div>
+                        @empty
+                            <div class="rounded-2xl border border-dashed border-white/10 py-12 text-center">
+                                <p class="text-sm text-slate-400">Belum ada data departemen payroll.</p>
+                            </div>
+                        @endforelse
+                    </div>
+                </div>
+            </section>
+
+            <section class="grid gap-6 xl:grid-cols-3">
+                <div class="rounded-3xl border border-white/10 bg-slate-900/80 p-6 shadow-2xl backdrop-blur-xl">
+                    <h3 class="text-xl font-semibold text-white">Kepatuhan Hari Kerja</h3>
+                    <p class="mt-1 text-sm text-slate-400">Perbandingan hadir terhadap target hari kerja.</p>
+
+                    <div class="mt-6 h-4 overflow-hidden rounded-full bg-slate-800">
+                        @php($underWidth = round(($payrollAnalysis['workday_compliance']['under'] / $complianceTotal) * 100, 1))
+                        @php($targetWidth = round(($payrollAnalysis['workday_compliance']['on_target'] / $complianceTotal) * 100, 1))
+                        @php($overWidth = round(($payrollAnalysis['workday_compliance']['over'] / $complianceTotal) * 100, 1))
+                        <div class="flex h-full">
+                            <div class="bg-rose-400" style="width: {{ $underWidth }}%"></div>
+                            <div class="bg-emerald-400" style="width: {{ $targetWidth }}%"></div>
+                            <div class="bg-cyan-400" style="width: {{ $overWidth }}%"></div>
+                        </div>
+                    </div>
+
+                    <div class="mt-5 grid gap-3 text-sm">
+                        <div class="flex items-center justify-between">
+                            <span class="flex items-center gap-2 text-slate-300"><span class="h-2.5 w-2.5 rounded-full bg-rose-400"></span>Di bawah target</span>
+                            <span class="font-semibold text-white">{{ $payrollAnalysis['workday_compliance']['under'] }}</span>
+                        </div>
+                        <div class="flex items-center justify-between">
+                            <span class="flex items-center gap-2 text-slate-300"><span class="h-2.5 w-2.5 rounded-full bg-emerald-400"></span>Sesuai target</span>
+                            <span class="font-semibold text-white">{{ $payrollAnalysis['workday_compliance']['on_target'] }}</span>
+                        </div>
+                        <div class="flex items-center justify-between">
+                            <span class="flex items-center gap-2 text-slate-300"><span class="h-2.5 w-2.5 rounded-full bg-cyan-400"></span>Di atas target</span>
+                            <span class="font-semibold text-white">{{ $payrollAnalysis['workday_compliance']['over'] }}</span>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="rounded-3xl border border-white/10 bg-slate-900/80 p-6 shadow-2xl backdrop-blur-xl">
+                    <h3 class="text-xl font-semibold text-white">Status Email Slip</h3>
+                    <p class="mt-1 text-sm text-slate-400">Kondisi distribusi slip gaji ke karyawan.</p>
+
+                    <div class="mt-6 flex items-center gap-5">
+                        <div class="relative h-32 w-32 shrink-0 rounded-full"
+                            style="background: conic-gradient({{ $statusPie }});">
+                            <div class="absolute inset-6 rounded-full border border-white/10 bg-slate-950/95"></div>
+                        </div>
+
+                        <div class="w-full space-y-3">
+                            @forelse ($payrollAnalysis['email_statuses'] as $status)
+                                @php($statusColor = $statusColors[$status['status']] ?? '#818cf8')
+                                <div class="flex items-center justify-between gap-3 text-sm">
+                                    <span class="flex items-center gap-2 text-slate-300">
+                                        <span class="h-2.5 w-2.5 rounded-full" style="background-color: {{ $statusColor }}"></span>
+                                        {{ $status['label'] }}
+                                    </span>
+                                    <span class="font-semibold text-white">{{ $status['count'] }}</span>
+                                </div>
+                            @empty
+                                <p class="text-sm text-slate-400">Belum ada status email.</p>
+                            @endforelse
+                        </div>
+                    </div>
+                </div>
+
+                <div class="rounded-3xl border border-white/10 bg-slate-900/80 p-6 shadow-2xl backdrop-blur-xl">
+                    <h3 class="text-xl font-semibold text-white">Top Lembur</h3>
+                    <p class="mt-1 text-sm text-slate-400">Karyawan dengan jam lembur tertinggi.</p>
+
+                    <div class="mt-6 space-y-3">
+                        @forelse ($payrollAnalysis['top_overtime_employees'] as $employee)
+                            <div class="flex items-center justify-between gap-4 rounded-2xl border border-white/5 bg-white/[0.03] px-4 py-3">
+                                <div class="min-w-0">
+                                    <p class="truncate text-sm font-semibold text-white">{{ $employee['name'] }}</p>
+                                    <p class="mt-1 text-xs text-slate-500">{{ $employee['period'] }}</p>
+                                </div>
+                                <span class="shrink-0 rounded-full bg-purple-500/10 px-3 py-1 text-xs font-bold text-purple-200">
+                                    {{ number_format($employee['hours'], 1, ',', '.') }} jam
+                                </span>
+                            </div>
+                        @empty
+                            <div class="rounded-2xl border border-dashed border-white/10 py-10 text-center">
+                                <p class="text-sm text-slate-400">Belum ada data lembur.</p>
+                            </div>
+                        @endforelse
+                    </div>
+                </div>
+            </section>
 
             <!-- Content -->
             <div class="grid gap-6 xl:grid-cols-3">

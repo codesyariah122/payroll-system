@@ -4,6 +4,7 @@ use App\Http\Controllers\DashboardController;
 use App\Http\Controllers\DepartmentController;
 use App\Http\Controllers\EmployeeController;
 use App\Http\Controllers\PayrollController;
+use App\Http\Controllers\PayrollTemplateController;
 use App\Http\Controllers\PositionController;
 use App\Http\Controllers\ProfileController;
 use Illuminate\Support\Facades\Route;
@@ -115,6 +116,23 @@ Route::middleware(['auth'])->group(function () {
 
         Route::delete('payrolls/destroy-all', [PayrollController::class, 'destroyAll'])
             ->name('payrolls.destroy-all');
+
+        Route::get('payroll-templates/default/preview', [PayrollTemplateController::class, 'previewDefault'])
+            ->name('payroll-templates.default.preview');
+
+        Route::post('payroll-templates/{payrollTemplate}/activate', [PayrollTemplateController::class, 'activate'])
+            ->name('payroll-templates.activate');
+
+        Route::post('payroll-templates/deactivate', [PayrollTemplateController::class, 'deactivate'])
+            ->name('payroll-templates.deactivate');
+
+        Route::get('payroll-templates/{payrollTemplate}/download', [PayrollTemplateController::class, 'download'])
+            ->name('payroll-templates.download');
+
+        Route::resource('payroll-templates', PayrollTemplateController::class)
+            ->parameters(['payroll-templates' => 'payrollTemplate'])
+            ->except('show');
+
         // RESOURCE PALING BAWAH
         Route::resource('payrolls', PayrollController::class);
 

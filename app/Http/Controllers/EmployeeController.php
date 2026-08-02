@@ -14,6 +14,7 @@ use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Storage;
+use Illuminate\Validation\Rule;
 use Maatwebsite\Excel\Facades\Excel;
 
 class EmployeeController extends Controller
@@ -21,8 +22,10 @@ class EmployeeController extends Controller
     public function index(Request $request)
     {
         $search = $request->search;
+        $companyId = $request->user()->company_id;
 
         $employees = Employee::with(['department', 'position', 'user'])
+            ->where('company_id', $companyId)
             ->when($search, function ($query) use ($search) {
                 $query->where(function ($q) use ($search) {
 
@@ -46,9 +49,9 @@ class EmployeeController extends Controller
         return view('admin.employees.index', compact('employees'));
     }
 
-    public function export()
+    public function export(Request $request)
     {
-        return Excel::download(new EmployeesExport(), 'employees.xlsx');
+        return Excel::download(new EmployeesExport($request->user()->company_id), 'employees.xlsx');
     }
 
     public function import()
@@ -58,33 +61,54 @@ class EmployeeController extends Controller
 
     public function importStore(EmployeeImportRequest $request)
     {
-        Excel::import(new EmployeeImport(), $request->file('file'));
+        $import = new EmployeeImport($request->user()->company);
+
+        DB::transaction(function () use ($import, $request) {
+            Excel::import($import, $request->file('file'));
+        });
+
+        $summary = $import->summary();
+
+        $message = "Data karyawan berhasil diimpor: {$summary['imported']} data dibuat/diperbarui.";
+
+        if ($summary['skipped'] > 0) {
+            $message .= " {$summary['skipped']} baris dilewati karena email kosong.";
+        }
 
         return redirect()->route('admin.employees.index')
-            ->with('status', 'Data karyawan berhasil diimpor.');
+            ->with('status', $message);
     }
 
-    public function create()
+    public function create(Request $request)
     {
         return view('admin.employees.create', [
-            'departments' => Department::orderBy('name')->get(),
-            'positions' => Position::orderBy('name')->get(),
+            'departments' => Department::where('company_id', $request->user()->company_id)->orderBy('name')->get(),
+            'positions' => Position::where('company_id', $request->user()->company_id)->orderBy('name')->get(),
         ]);
     }
 
     public function store(EmployeeRequest $request)
     {
         $data = $request->validated();
+        $companyId = $request->user()->company_id;
 
-        $user = User::create([
-            'name' => $data['name'],
-            'email' => $data['email'],
-            'password' => Hash::make($data['password']),
-            'role' => 'employee',
-        ]);
+        $this->validateEmployeeOrganization($data, $companyId);
+
+        $user = null;
+
+        if ($request->boolean('create_user')) {
+            $user = User::create([
+                'company_id' => $companyId,
+                'name' => $data['name'],
+                'email' => $data['email'],
+                'password' => Hash::make($data['password']),
+                'role' => 'employee',
+            ]);
+        }
 
         Employee::create([
-            'user_id' => $user->id,
+            'company_id' => $companyId,
+            'user_id' => $user?->id,
             'department_id' => $data['department_id'],
             'position_id' => $data['position_id'],
             'nip' => $data['nip'],
@@ -107,18 +131,23 @@ class EmployeeController extends Controller
         return redirect()->route('admin.employees.edit', $employee);
     }
 
-    public function edit(Employee $employee)
+    public function edit(Request $request, Employee $employee)
     {
+        $this->authorizeCompany($request, $employee);
+
         return view('admin.employees.edit', [
             'employee' => $employee,
-            'departments' => Department::orderBy('name')->get(),
-            'positions' => Position::orderBy('name')->get(),
+            'departments' => Department::where('company_id', $request->user()->company_id)->orderBy('name')->get(),
+            'positions' => Position::where('company_id', $request->user()->company_id)->orderBy('name')->get(),
         ]);
     }
 
     public function update(EmployeeRequest $request, Employee $employee)
     {
+        $this->authorizeCompany($request, $employee);
+
         $data = $request->validated();
+        $this->validateEmployeeOrganization($data, $request->user()->company_id);
 
         $employee->update([
             'department_id' => $data['department_id'],
@@ -134,24 +163,38 @@ class EmployeeController extends Controller
             'status' => $data['status'],
         ]);
 
-        $userData = [
-            'name' => $data['name'],
-            'email' => $data['email'],
-        ];
+        if ($employee->user) {
+            $userData = [
+                'name' => $data['name'],
+                'email' => $data['email'],
+            ];
 
-        if (! empty($data['password'])) {
-            $userData['password'] = Hash::make($data['password']);
+            if (! empty($data['password'])) {
+                $userData['password'] = Hash::make($data['password']);
+            }
+
+            $employee->user()->update($userData);
+        } elseif ($request->boolean('create_user')) {
+            $user = User::create([
+                'company_id' => $request->user()->company_id,
+                'name' => $data['name'],
+                'email' => $data['email'],
+                'password' => Hash::make($data['password']),
+                'role' => 'employee',
+            ]);
+
+            $employee->update(['user_id' => $user->id]);
         }
-
-        $employee->user()->update($userData);
 
         return redirect()->route('admin.employees.index')
             ->with('status', 'Data karyawan berhasil diperbarui.');
     }
 
-    public function destroy(Employee $employee)
+    public function destroy(Request $request, Employee $employee)
     {
-        $employee->user()->delete();
+        $this->authorizeCompany($request, $employee);
+
+        $employee->user?->delete();
         $employee->delete();
 
         return redirect()->route('admin.employees.index')
@@ -165,8 +208,12 @@ class EmployeeController extends Controller
             'employee_ids.*' => ['integer', 'exists:employees,id'],
         ]);
 
-        $deletedCount = DB::transaction(function () use ($data) {
-            $employees = Employee::whereIn('id', $data['employee_ids'])->get(['id', 'user_id']);
+        $companyId = $request->user()->company_id;
+
+        $deletedCount = DB::transaction(function () use ($data, $companyId) {
+            $employees = Employee::where('company_id', $companyId)
+                ->whereIn('id', $data['employee_ids'])
+                ->get(['id', 'user_id']);
             $userIds = $employees->pluck('user_id')->filter()->all();
             $employeeIds = $employees->pluck('id')->all();
 
@@ -180,32 +227,29 @@ class EmployeeController extends Controller
             ->with('status', "{$deletedCount} karyawan berhasil dihapus.");
     }
 
-    public function destroyAll()
+    public function destroyAll(Request $request)
     {
         try {
-            $employeeCount = Employee::count();
-            $payrollCount = DB::table('payrolls')->count();
+            $companyId = $request->user()->company_id;
+            $employeeIds = Employee::where('company_id', $companyId)->pluck('id')->all();
+            $employeeCount = count($employeeIds);
+            $payrollCount = DB::table('payrolls')->where('company_id', $companyId)->count();
 
             DB::beginTransaction();
 
-            $userIds = Employee::whereNotNull('user_id')->pluck('user_id')->all();
+            $userIds = Employee::where('company_id', $companyId)
+                ->whereNotNull('user_id')
+                ->pluck('user_id')
+                ->all();
 
-            $deletedJobs = DB::table('jobs')
-                ->where('payload', 'like', '%SendPayrollSlipEmailJob%')
-                ->orWhere('payload', 'like', '%GeneratePayrollPdfJob%')
-                ->delete();
+            $deletedJobs = 0;
 
-            DB::table('failed_jobs')
-                ->where('payload', 'like', '%SendPayrollSlipEmailJob%')
-                ->orWhere('payload', 'like', '%GeneratePayrollPdfJob%')
-                ->delete();
-
-            Employee::query()->delete();
+            Employee::whereIn('id', $employeeIds)->delete();
             User::whereIn('id', $userIds)->delete();
 
             DB::commit();
 
-            Storage::disk('local')->deleteDirectory('payroll-slips');
+            Storage::disk('local')->deleteDirectory("payroll-slips/company-{$companyId}");
 
             return redirect()->route('admin.employees.index')
                 ->with(
@@ -220,5 +264,24 @@ class EmployeeController extends Controller
             return redirect()->route('admin.employees.index')
                 ->with('error', 'Gagal menghapus semua karyawan: ' . $e->getMessage());
         }
+    }
+
+    private function authorizeCompany(Request $request, Employee $employee): void
+    {
+        abort_if($employee->company_id !== $request->user()->company_id, 404);
+    }
+
+    private function validateEmployeeOrganization(array $data, int $companyId): void
+    {
+        validator($data, [
+            'department_id' => [
+                'nullable',
+                Rule::exists('departments', 'id')->where('company_id', $companyId),
+            ],
+            'position_id' => [
+                'nullable',
+                Rule::exists('positions', 'id')->where('company_id', $companyId),
+            ],
+        ])->validate();
     }
 }

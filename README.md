@@ -1,3 +1,10 @@
+<img width="2880" height="3012" alt="PayrollSystem(2)" src="https://github.com/user-attachments/assets/702ffb2e-09ae-431f-b103-9d4b0b922525" />
+
+<img width="2880" height="3982" alt="PayrollSystem(1)" src="https://github.com/user-attachments/assets/4d2196e6-a8dd-453f-9f7e-6ee7b6db5b61" />
+
+<img width="2880" height="3950" alt="PayrollSystem" src="https://github.com/user-attachments/assets/c3a9f864-535a-40b7-9c49-e1ca1282f985" />
+
+
 <p align="center"><a href="https://laravel.com" target="_blank"><img src="https://raw.githubusercontent.com/laravel/art/master/logo-lockup/5%20SVG/2%20CMYK/1%20Full%20Color/laravel-logolockup-cmyk-red.svg" width="400" alt="Laravel Logo"></a></p>
 
 <p align="center">

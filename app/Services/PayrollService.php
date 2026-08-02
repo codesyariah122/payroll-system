@@ -54,6 +54,7 @@ class PayrollService
         $data = $this->normalizePayrollData($data);
 
         $payroll = Payroll::create([
+            'company_id' => $employee->company_id,
             'employee_id' => $employee->id,
 
             'position_name' => !empty($data['position_name'])

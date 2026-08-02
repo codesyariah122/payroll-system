@@ -1,5 +1,6 @@
 <nav x-data="{ open: false }"
     class="sticky top-0 z-50 border-b border-white/5 bg-slate-950/80 backdrop-blur-2xl shadow-[0_1px_0_rgba(255,255,255,0.03)]">
+    @php($company = Auth::user()?->company)
 
     <div class="px-4 sm:px-6 lg:px-8">
         <div class="flex h-16 items-center justify-between">
@@ -12,7 +13,11 @@
 
                     <div class="flex items-center justify-center shrink-0">
 
-                        <x-application-logo class="h-9 w-auto object-contain" />
+                        @if ($company?->logo_path)
+                            <img src="{{ asset($company->logo_path) }}" alt="{{ $company->name }}" class="h-9 w-auto max-w-36 object-contain" />
+                        @else
+                            <x-application-logo class="h-9 w-auto object-contain" />
+                        @endif
 
                     </div>
 

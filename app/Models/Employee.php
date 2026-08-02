@@ -10,6 +10,7 @@ use Illuminate\Database\Eloquent\Relations\HasOne;
 class Employee extends Model
 {
     protected $fillable = [
+        'company_id',
         'user_id',
         'department_id',
         'position_id',
@@ -33,6 +34,11 @@ class Employee extends Model
     public function user(): BelongsTo
     {
         return $this->belongsTo(User::class);
+    }
+
+    public function company(): BelongsTo
+    {
+        return $this->belongsTo(Company::class);
     }
 
     public function department(): BelongsTo

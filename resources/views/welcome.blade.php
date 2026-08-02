@@ -2185,26 +2185,16 @@
 
         <div class="mx-auto flex max-w-7xl items-center justify-between px-6 py-6">
 
-            <!-- Logo -->
-            <!-- Logo -->
             <a href="/" class="flex items-center gap-3">
-
-                <div
-                    class="flex h-12 w-12 items-center justify-center rounded-xl bg-white/5 ring-1 ring-white/10 overflow-hidden">
-
-                    <img src="https://citrarasakulinerindonesia.com/build/assets/crk-logo.png" alt="Logo"
-                        class="h-9 w-auto object-contain">
-
-                </div>
 
                 <div class="leading-tight">
 
                     <h1 class="text-base font-semibold tracking-wide text-white">
-                        HC Operation
+                        Payroll System
                     </h1>
 
                     <p class="text-xs text-slate-400">
-                        Payroll Management System
+                        Platform HC Operation
                     </p>
 
                 </div>
@@ -2251,7 +2241,7 @@
         <div
             class="mb-8 inline-flex items-center gap-2 rounded-full border border-indigo-500/20 bg-indigo-500/10 px-4 py-2 text-sm font-medium text-indigo-300 backdrop-blur-xl">
 
-            🚀 Smart Payroll Platform For Modern Teams
+            Smart Payroll Platform untuk Tim HC Operation
 
         </div>
 
@@ -2261,7 +2251,7 @@
             Payroll Management
             <span class="bg-gradient-to-r from-indigo-400 via-cyan-400 to-sky-400 bg-clip-text text-transparent">
 
-                CRK Group
+                Untuk Perusahaan Modern
 
             </span>
 
@@ -2270,10 +2260,9 @@
         <!-- Description -->
         <p class="mt-8 max-w-3xl text-lg leading-relaxed text-slate-400 md:text-xl">
 
-            Kelola payroll, slip gaji, absensi,
-            data karyawan, dan distribusi email payroll
-            dalam satu dashboard modern yang cepat,
-            aman, dan mudah digunakan.
+            Bantu tim HC Operation mengelola data karyawan, import Excel payroll,
+            validasi slip gaji, generate PDF, dan distribusi email secara terstruktur
+            untuk kebutuhan perusahaan di Indonesia.
 
         </p>
 
@@ -2385,6 +2374,58 @@
 
     </main>
 
+    <!-- Product Context -->
+    <section class="mx-auto max-w-7xl px-6 pb-24">
+        <div class="grid gap-6 lg:grid-cols-3">
+            <div class="rounded-[2rem] border border-white/10 bg-white/5 p-8 text-left backdrop-blur-xl lg:col-span-1">
+                <p class="text-sm font-semibold uppercase tracking-[0.25em] text-cyan-300">
+                    Untuk HC Operation
+                </p>
+
+                <h2 class="mt-4 text-3xl font-bold tracking-tight text-white">
+                    Payroll lebih rapi dari data awal sampai slip terkirim
+                </h2>
+
+                <p class="mt-4 text-sm leading-relaxed text-slate-400">
+                    Sistem ini dirancang untuk membantu tim HR/HC yang rutin menerima data Excel dari berbagai cabang,
+                    mengecek nominal, memastikan data karyawan cocok, lalu mengirim slip gaji ke email masing-masing karyawan.
+                </p>
+            </div>
+
+            <div class="grid gap-6 md:grid-cols-2 lg:col-span-2">
+                <div class="rounded-[2rem] border border-white/10 bg-slate-900/70 p-6 text-left">
+                    <p class="text-sm font-semibold text-white">Import Excel yang lebih toleran</p>
+                    <p class="mt-3 text-sm leading-relaxed text-slate-400">
+                        Mendukung variasi header payroll dan karyawan, sehingga data tetap bisa diproses meski format tim lapangan
+                        tidak selalu konsisten.
+                    </p>
+                </div>
+
+                <div class="rounded-[2rem] border border-white/10 bg-slate-900/70 p-6 text-left">
+                    <p class="text-sm font-semibold text-white">Preview sebelum kirim</p>
+                    <p class="mt-3 text-sm leading-relaxed text-slate-400">
+                        Tim HC dapat mengecek detail payroll dan PDF slip gaji terlebih dahulu sebelum email dikirim massal.
+                    </p>
+                </div>
+
+                <div class="rounded-[2rem] border border-white/10 bg-slate-900/70 p-6 text-left">
+                    <p class="text-sm font-semibold text-white">Queue email untuk shared hosting</p>
+                    <p class="mt-3 text-sm leading-relaxed text-slate-400">
+                        Pengiriman slip payroll diproses melalui antrean agar lebih ringan dan tidak membebani web saat jumlah
+                        karyawan besar.
+                    </p>
+                </div>
+
+                <div class="rounded-[2rem] border border-white/10 bg-slate-900/70 p-6 text-left">
+                    <p class="text-sm font-semibold text-white">Multi-company ready</p>
+                    <p class="mt-3 text-sm leading-relaxed text-slate-400">
+                        Data karyawan, departemen, posisi, payroll, dan template slip dipisahkan per perusahaan agar tidak tercampur.
+                    </p>
+                </div>
+            </div>
+        </div>
+    </section>
+
     <!-- Features -->
     <section id="features" class="mx-auto max-w-7xl px-6 pb-24">
 
@@ -2397,7 +2438,7 @@
             <h2 class="mt-4 text-4xl font-bold tracking-tight text-white">
 
                 Semua Yang Dibutuhkan
-                Tim HR Modern
+                Tim HC Modern
 
             </h2>
 
@@ -2421,7 +2462,7 @@
                 </h3>
 
                 <p class="mt-3 text-sm leading-relaxed text-slate-400">
-                    Kelola payroll otomatis dengan sistem modern dan efisien.
+                    Kelola periode payroll, komponen pendapatan, potongan, THP, dan status pengiriman dalam satu halaman kerja.
                 </p>
 
             </div>
@@ -2440,7 +2481,7 @@
                 </h3>
 
                 <p class="mt-3 text-sm leading-relaxed text-slate-400">
-                    Generate slip gaji PDF secara otomatis dan profesional.
+                    Generate slip gaji PDF otomatis dengan template default atau template custom sesuai identitas perusahaan.
                 </p>
 
             </div>
@@ -2460,7 +2501,7 @@
                 </h3>
 
                 <p class="mt-3 text-sm leading-relaxed text-slate-400">
-                    Kirim slip gaji massal otomatis ke seluruh karyawan.
+                    Kirim slip gaji massal, lewati nominal Rp 0, dan tandai email tidak valid agar mudah ditindaklanjuti.
                 </p>
 
             </div>
@@ -2480,7 +2521,7 @@
                 </h3>
 
                 <p class="mt-3 text-sm leading-relaxed text-slate-400">
-                    Dashboard analytics realtime untuk monitoring payroll.
+                    Pantau total karyawan, total payroll, periode terbaru, dan aktivitas payroll dari dashboard admin.
                 </p>
 
             </div>

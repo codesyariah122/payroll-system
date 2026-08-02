@@ -5,6 +5,7 @@ namespace App\Http\Requests;
 use App\Models\Employee;
 use Illuminate\Foundation\Http\FormRequest;
 use Illuminate\Validation\Rule;
+use Illuminate\Validation\Rules\Password;
 
 class EmployeeRequest extends FormRequest
 {
@@ -40,7 +41,13 @@ class EmployeeRequest extends FormRequest
             'basic_salary' => ['required', 'numeric', 'min:0'],
             'allowance' => ['required', 'numeric', 'min:0'],
             'status' => ['required', Rule::in(['active', 'inactive'])],
-            'password' => [$this->isMethod('post') ? 'required' : 'nullable', 'string', 'min:8'],
+            'create_user' => ['nullable', 'boolean'],
+            'password' => [
+                Rule::requiredIf(fn () => $this->boolean('create_user') && ! $employee?->user),
+                'nullable',
+                'confirmed',
+                Password::defaults(),
+            ],
         ];
     }
 }

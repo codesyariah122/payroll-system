@@ -23,9 +23,12 @@ class SendPayrollSlipEmailJob implements ShouldQueue
 
     protected int $payrollId;
 
-    public function __construct(Payroll $payroll)
+    protected ?string $recipientOverride;
+
+    public function __construct(Payroll $payroll, ?string $recipientOverride = null)
     {
         $this->payrollId = $payroll->id;
+        $this->recipientOverride = $recipientOverride;
     }
 
     public function handle(PayrollPdfService $pdfService): void
@@ -40,6 +43,21 @@ class SendPayrollSlipEmailJob implements ShouldQueue
                 Log::info('PAYROLL EMAIL SKIPPED', [
                     'payroll_id' => $payroll->id,
                     'email_status' => $payroll->email_status,
+                ]);
+
+                return;
+            }
+
+            if ((float) $payroll->take_home_pay <= 0) {
+                Payroll::where('id', $payroll->id)
+                    ->update([
+                        'email_status' => 'skipped',
+                        'email_error' => 'Total gaji bersih 0, email tidak dikirim.',
+                    ]);
+
+                Log::info('PAYROLL EMAIL SKIPPED ZERO SALARY', [
+                    'payroll_id' => $payroll->id,
+                    'take_home_pay' => $payroll->take_home_pay,
                 ]);
 
                 return;
@@ -70,7 +88,9 @@ class SendPayrollSlipEmailJob implements ShouldQueue
                 'payroll_id' => $payroll->id,
             ]);
 
-            Mail::to($payroll->employee->email)
+            $recipient = $this->recipientOverride ?: $payroll->employee->email;
+
+            Mail::to($recipient)
                 ->send(new PayrollSlipMail($payroll));
 
             Log::info('AFTER SEND', [
@@ -90,7 +110,7 @@ class SendPayrollSlipEmailJob implements ShouldQueue
 
             Log::info('PAYROLL EMAIL SENT', [
                 'payroll_id' => $payroll->id,
-                'email' => $payroll->employee->email,
+                'email' => $recipient,
             ]);
         } catch (\Throwable $e) {
 
