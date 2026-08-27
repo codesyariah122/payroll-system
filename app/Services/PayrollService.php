@@ -53,7 +53,45 @@ class PayrollService
     {
         $data = $this->normalizePayrollData($data);
 
-        $payroll = Payroll::create([
+        $payroll = Payroll::create($this->payrollPayload($employee, $data));
+
+        $payroll->refresh();
+
+        return $payroll;
+    }
+
+    public function createOrUpdatePayroll(Employee $employee, array $data): array
+    {
+        $data = $this->normalizePayrollData($data);
+
+        $payroll = Payroll::where('company_id', $employee->company_id)
+            ->where('employee_id', $employee->id)
+            ->where('period', $data['period'])
+            ->first();
+
+        $created = ! $payroll;
+        $payroll ??= new Payroll();
+
+        $payroll->fill($this->payrollPayload($employee, $data));
+
+        if (! $created) {
+            $payroll->fill([
+                'pdf_path' => null,
+                'email_status' => 'pending',
+                'email_error' => null,
+                'email_sent_at' => null,
+            ]);
+        }
+
+        $payroll->save();
+        $payroll->refresh();
+
+        return [$payroll, $created];
+    }
+
+    protected function payrollPayload(Employee $employee, array $data): array
+    {
+        return [
             'company_id' => $employee->company_id,
             'employee_id' => $employee->id,
 
@@ -94,11 +132,7 @@ class PayrollService
             'overtime' => $data['overtime'],
             'deduction' => $data['deduction'],
             'total_salary' => $data['total_salary'],
-        ]);
-
-        $payroll->refresh();
-
-        return $payroll;
+        ];
     }
 
     public function createPayrollWithPdf(Employee $employee, array $data): Payroll

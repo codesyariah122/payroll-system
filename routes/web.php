@@ -10,11 +10,48 @@ use App\Http\Controllers\ProfileController;
 use Illuminate\Support\Facades\Route;
 use Illuminate\Support\Facades\Mail;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Artisan;
 use App\Models\Payroll;
 use App\Jobs\SendPayrollSlipEmailJob;
 
 Route::get('/', function () {
     return view('welcome');
+});
+
+Route::get('/admin/payrolls/stop-queue', function () {
+
+    // 1. Hentikan worker secara graceful
+    Artisan::call('queue:restart');
+
+    // 2. Hapus semua pending job dari database queue
+    $deletedJobs = DB::table('jobs')
+        ->where('queue', 'default')
+        ->delete();
+
+    // 3. Clear failed jobs juga kalau memang ingin reset total
+    // Jangan aktifkan kalau failed_jobs masih ingin disimpan untuk debugging.
+    // DB::table('failed_jobs')->delete();
+
+    // 4. Clear Laravel cache
+    Artisan::call('cache:clear');
+    $cacheOutput = Artisan::output();
+
+    // 5. Clear config
+    Artisan::call('config:clear');
+    $configOutput = Artisan::output();
+
+    // 6. Clear view
+    Artisan::call('view:clear');
+    $viewOutput = Artisan::output();
+
+    return response()->json([
+        'success' => true,
+        'message' => 'Queue payroll berhasil dihentikan/reset.',
+        'deleted_jobs' => $deletedJobs,
+        'cache_clear' => $cacheOutput,
+        'config_clear' => $configOutput,
+        'view_clear' => $viewOutput,
+    ]);
 });
 
 Route::get('/resend-payroll-queue', function () {
@@ -45,14 +82,14 @@ Route::get('/run-worker', function () {
 
     try {
 
-        \Artisan::call('queue:work', [
+        Artisan::call('queue:work', [
             '--queue' => 'default',
             '--once' => true,
             '--tries' => 3,
             '--timeout' => 120,
         ]);
 
-        return '<pre>' . \Artisan::output() . '</pre>';
+        return '<pre>' . Artisan::output() . '</pre>';
     } catch (\Throwable $e) {
 
         return response()->json([
@@ -63,9 +100,21 @@ Route::get('/run-worker', function () {
 });
 
 Route::get('/clear-config', function () {
-    \Artisan::call('optimize:clear');
+    Artisan::call('optimize:clear');
 
     return 'Config cleared';
+});
+
+Route::get('/debug-server', function () {
+    return response()->json([
+        'php' => PHP_VERSION,
+        'env' => app()->environment(),
+        'debug' => config('app.debug'),
+        'view_welcome' => view()->exists('welcome'),
+        'manifest' => file_exists(public_path('build/manifest.json')),
+        'storage_writable' => is_writable(storage_path()),
+        'cache_writable' => is_writable(base_path('bootstrap/cache')),
+    ]);
 });
 
 
@@ -80,14 +129,65 @@ Route::get('/test-mail', function () {
     return 'Email berhasil dikirim';
 });
 
+Route::get('/deploy-migrate-20260802/{key}', function ($key) {
+    abort_unless(hash_equals($key, 'pyrl-systemxx-migrate-8x29-private'), 404);
+
+    Artisan::call('migrate', [
+        '--force' => true,
+    ]);
+
+    $migrateOutput = Artisan::output();
+
+    Artisan::call('db:seed', [
+        '--class' => 'AdminCompanySeeder',
+        '--force' => true,
+    ]);
+
+    $seedOutput = Artisan::output();
+
+    Artisan::call('optimize:clear');
+
+    return response(
+        '<pre>MIGRATE:' . PHP_EOL . e($migrateOutput) .
+            PHP_EOL . PHP_EOL . 'SEED:' . PHP_EOL . e($seedOutput) . '</pre>'
+    );
+});
+
+Route::get('/cleanup-employee-users-20260802/{key}', function ($key) {
+    abort_unless(hash_equals($key, 'pyrl-cleanup-users-8x29-private'), 404);
+
+    Artisan::call('db:seed', [
+        '--class' => 'CleanupEmployeeUsersSeeder',
+        '--force' => true,
+    ]);
+
+    Artisan::call('optimize:clear');
+
+    return response('<pre>' . e(Artisan::output()) . '</pre>');
+});
+
 Route::middleware(['auth'])->group(function () {
     Route::get('/dashboard', [DashboardController::class, 'index'])->name('dashboard');
 
     Route::middleware(['role:admin'])->prefix('admin')->name('admin.')->group(function () {
 
+        // Route::get('payrolls/queue-status', function () {
+
+        //     $pending = DB::table('jobs')
+        //         ->where('queue', 'default')
+        //         ->whereNull('reserved_at')
+        //         ->count();
+
+        //     return response()->json([
+        //         'processing' => $pending > 0,
+        //         'pending_jobs' => $pending,
+        //     ]);
+        // })->name('payrolls.queue-status');
         Route::get('payrolls/queue-status', function () {
 
-            $pending = DB::table('jobs')->count();
+            $pending = DB::table('jobs')
+                ->where('queue', 'default')
+                ->count();
 
             return response()->json([
                 'processing' => $pending > 0,

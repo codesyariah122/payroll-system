@@ -219,7 +219,7 @@ class PayrollController extends Controller
                 ->with('error', 'Import payroll dibatalkan. ' . implode(' ', $summary['errors']));
         }
 
-        $message = "Data payroll berhasil diimpor: {$summary['created']} data dibuat.";
+        $message = "Data payroll berhasil diimpor: {$summary['created']} data dibuat, {$summary['updated']} data diperbarui.";
 
         if ($summary['skipped'] > 0) {
             $message .= " {$summary['skipped']} baris dilewati karena email tidak cocok/kosong.";

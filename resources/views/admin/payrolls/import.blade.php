@@ -27,7 +27,8 @@
                                 Total Gaji Bersih.</p>
                             <p class="mt-4 text-sm text-slate-500 dark:text-slate-400">Jika header penting seperti
                                 Email, Bulan, Target Hari Kerja, Hari Kerja, Gaji Pokok, atau Total Gaji Bersih tidak
-                                terbaca, import akan dibatalkan agar slip tidak terlanjur dibuat dengan angka kosong.</p>
+                                terbaca, import akan dibatalkan agar slip tidak terlanjur dibuat dengan angka kosong.
+                            </p>
                             <p class="mt-4 text-sm text-slate-500 dark:text-slate-400">Sistem mencocokkan karyawan dari
                                 kolom Email. Jika memakai format lama, kolom NIP masih didukung sebagai cadangan.</p>
                         </div>

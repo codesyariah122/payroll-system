@@ -6,10 +6,12 @@ use App\Exports\EmployeesExport;
 use App\Http\Requests\EmployeeImportRequest;
 use App\Http\Requests\EmployeeRequest;
 use App\Imports\EmployeeImport;
+use App\Imports\PayrollImport;
 use App\Models\Department;
 use App\Models\Employee;
 use App\Models\Position;
 use App\Models\User;
+use App\Services\PayrollService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Hash;
@@ -59,20 +61,33 @@ class EmployeeController extends Controller
         return view('admin.employees.import');
     }
 
-    public function importStore(EmployeeImportRequest $request)
+    public function importStore(EmployeeImportRequest $request, PayrollService $payrollService)
     {
         $import = new EmployeeImport($request->user()->company);
+        $payrollImport = new PayrollImport($payrollService, $request->user()->company, false);
 
-        DB::transaction(function () use ($import, $request) {
+        DB::transaction(function () use ($import, $payrollImport, $request) {
             Excel::import($import, $request->file('file'));
+            Excel::import($payrollImport, $request->file('file'));
         });
 
         $summary = $import->summary();
+        $payrollSummary = $payrollImport->summary();
 
         $message = "Data karyawan berhasil diimpor: {$summary['imported']} data dibuat/diperbarui.";
 
         if ($summary['skipped'] > 0) {
             $message .= " {$summary['skipped']} baris dilewati karena email kosong.";
+        }
+
+        if ($payrollSummary['created'] > 0 || $payrollSummary['updated'] > 0) {
+            $message .= " Payroll otomatis diproses: {$payrollSummary['created']} dibuat, {$payrollSummary['updated']} diperbarui.";
+
+            if ($payrollSummary['skipped'] > 0) {
+                $message .= " {$payrollSummary['skipped']} payroll dilewati karena email tidak cocok/kosong.";
+            }
+        } elseif ($payrollSummary['payroll_headers_detected'] && ! empty($payrollSummary['errors'])) {
+            $message .= ' Payroll belum dibuat karena header payroll belum lengkap.';
         }
 
         return redirect()->route('admin.employees.index')

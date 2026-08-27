@@ -34,7 +34,7 @@ class PayrollImport implements
 
     protected const DEPARTMENT_ALIASES = ['departemen', 'department', 'bagian', 'divisi'];
 
-    protected const REQUIRED_HEADERS = [
+    public const REQUIRED_HEADERS = [
         'Email' => self::EMAIL_ALIASES,
         'Bulan / Periode' => PayrollSlipFormat::IMPORT_ALIASES['period'],
         'Target Hari Kerja' => PayrollSlipFormat::IMPORT_ALIASES['target_work_days'],
@@ -45,14 +45,21 @@ class PayrollImport implements
 
     protected int $createdCount = 0;
 
+    protected int $updatedCount = 0;
+
     protected int $skippedCount = 0;
 
     protected array $importErrors = [];
 
     protected array $warnings = [];
 
-    public function __construct(protected PayrollService $payrollService, protected Company $company)
-    {
+    protected bool $payrollHeadersDetected = false;
+
+    public function __construct(
+        protected PayrollService $payrollService,
+        protected Company $company,
+        protected bool $requirePayrollHeaders = true
+    ) {
         HeadingRowFormatter::extend('custom', function ($value) {
 
             $value = strtolower(trim($value));
@@ -69,7 +76,7 @@ class PayrollImport implements
 
     public function collection(Collection $rows): void
     {
-        $rows = $rows->filter(fn (Collection $row) => $row->filter()->isNotEmpty())->values();
+        $rows = $rows->filter(fn(Collection $row) => $row->filter()->isNotEmpty())->values();
 
         Log::info('TOTAL ROWS IMPORT', [
             'count' => $rows->count(),
@@ -82,6 +89,10 @@ class PayrollImport implements
         }
 
         $this->validateRequiredHeaders($rows->first());
+
+        if (! $this->payrollHeadersDetected && ! $this->requirePayrollHeaders) {
+            return;
+        }
 
         if (! empty($this->importErrors)) {
             return;
@@ -102,12 +113,12 @@ class PayrollImport implements
 
             $this->syncEmployeeOrganization($employee, $row);
 
-            $this->payrollService->createPayroll(
+            [, $created] = $this->payrollService->createOrUpdatePayroll(
                 $employee,
                 $this->payrollData($row)
             );
 
-            $this->createdCount++;
+            $created ? $this->createdCount++ : $this->updatedCount++;
         }
     }
 
@@ -115,9 +126,11 @@ class PayrollImport implements
     {
         return [
             'created' => $this->createdCount,
+            'updated' => $this->updatedCount,
             'skipped' => $this->skippedCount,
             'errors' => $this->importErrors,
             'warnings' => $this->warnings,
+            'payroll_headers_detected' => $this->payrollHeadersDetected,
         ];
     }
 
@@ -301,17 +314,28 @@ class PayrollImport implements
 
     protected function validateRequiredHeaders(Collection $row): void
     {
-        $headers = $row->keys()->filter(fn ($header) => is_string($header) && $header !== '')->all();
+        $headers = $row->keys()->filter(fn($header) => is_string($header) && $header !== '')->all();
+        $missingHeaders = [];
 
         foreach (self::REQUIRED_HEADERS as $label => $aliases) {
-            if (! $this->hasAnyHeader($headers, $aliases)) {
-                $this->importErrors[] = sprintf(
-                    'Header "%s" tidak ditemukan. Nama yang didukung: %s.',
-                    $label,
-                    implode(', ', $aliases)
-                );
+            if ($this->hasAnyHeader($headers, $aliases)) {
+                $this->payrollHeadersDetected = true;
+
+                continue;
             }
+
+            $missingHeaders[] = sprintf(
+                'Header "%s" tidak ditemukan. Nama yang didukung: %s.',
+                $label,
+                implode(', ', $aliases)
+            );
         }
+
+        if (! $this->payrollHeadersDetected && ! $this->requirePayrollHeaders) {
+            return;
+        }
+
+        $this->importErrors = array_merge($this->importErrors, $missingHeaders);
     }
 
     protected function hasAnyHeader(array $headers, array $aliases): bool
