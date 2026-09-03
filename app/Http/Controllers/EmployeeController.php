@@ -6,7 +6,6 @@ use App\Exports\EmployeesExport;
 use App\Http\Requests\EmployeeImportRequest;
 use App\Http\Requests\EmployeeRequest;
 use App\Imports\EmployeeImport;
-use App\Imports\PayrollImport;
 use App\Models\Department;
 use App\Models\Employee;
 use App\Models\Position;
@@ -63,16 +62,14 @@ class EmployeeController extends Controller
 
     public function importStore(EmployeeImportRequest $request, PayrollService $payrollService)
     {
-        $import = new EmployeeImport($request->user()->company);
-        $payrollImport = new PayrollImport($payrollService, $request->user()->company, false);
+        $import = new EmployeeImport($request->user()->company, $payrollService);
 
-        DB::transaction(function () use ($import, $payrollImport, $request) {
+        DB::transaction(function () use ($import, $request) {
             Excel::import($import, $request->file('file'));
-            Excel::import($payrollImport, $request->file('file'));
         });
 
         $summary = $import->summary();
-        $payrollSummary = $payrollImport->summary();
+        $payrollSummary = $summary['payroll'];
 
         $message = "Data karyawan berhasil diimpor: {$summary['imported']} data dibuat/diperbarui.";
 
@@ -86,8 +83,10 @@ class EmployeeController extends Controller
             if ($payrollSummary['skipped'] > 0) {
                 $message .= " {$payrollSummary['skipped']} payroll dilewati karena email tidak cocok/kosong.";
             }
-        } elseif ($payrollSummary['payroll_headers_detected'] && ! empty($payrollSummary['errors'])) {
-            $message .= ' Payroll belum dibuat karena header payroll belum lengkap.';
+        } elseif ($payrollSummary['payroll_data_detected'] && ! empty($payrollSummary['errors'])) {
+            $message .= ' Payroll belum dibuat untuk sebagian baris: ' . implode(' ', array_slice($payrollSummary['errors'], 0, 3));
+        } elseif (! $payrollSummary['payroll_data_detected']) {
+            $message .= ' Tidak ada payroll otomatis karena file belum memiliki kolom periode/gaji payroll.';
         }
 
         return redirect()->route('admin.employees.index')

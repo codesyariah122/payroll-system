@@ -12,6 +12,7 @@ use Illuminate\Queue\InteractsWithQueue;
 use Illuminate\Queue\SerializesModels;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Mail;
+use Throwable;
 
 class SendPayrollSlipEmailJob implements ShouldQueue
 {
@@ -127,5 +128,15 @@ class SendPayrollSlipEmailJob implements ShouldQueue
 
             throw $e;
         }
+    }
+
+    public function failed(?Throwable $exception): void
+    {
+        Payroll::where('id', $this->payrollId)
+            ->update([
+                'email_status' => 'failed',
+                'email_sent_at' => null,
+                'email_error' => $exception?->getMessage() ?: 'Email job failed before SMTP success was confirmed.',
+            ]);
     }
 }

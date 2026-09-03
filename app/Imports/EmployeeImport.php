@@ -5,8 +5,11 @@ namespace App\Imports;
 use App\Models\Company;
 use App\Models\Department;
 use App\Models\Employee;
+use App\Models\Payroll;
 use App\Models\Position;
+use App\Services\PayrollService;
 use App\Support\OrganizationLookup;
+use App\Support\PayrollSlipFormat;
 use Illuminate\Support\Collection;
 use Maatwebsite\Excel\Imports\HeadingRowFormatter;
 use Maatwebsite\Excel\Concerns\Importable;
@@ -53,8 +56,20 @@ class EmployeeImport implements ToCollection, WithHeadingRow, SkipsOnFailure, Sk
 
     protected int $skippedCount = 0;
 
-    public function __construct(protected Company $company)
-    {
+    protected int $payrollCreatedCount = 0;
+
+    protected int $payrollUpdatedCount = 0;
+
+    protected int $payrollSkippedCount = 0;
+
+    protected bool $payrollDataDetected = false;
+
+    protected array $payrollErrors = [];
+
+    public function __construct(
+        protected Company $company,
+        protected ?PayrollService $payrollService = null
+    ) {
         HeadingRowFormatter::extend('custom', function ($value) {
             $value = strtolower(trim((string) $value));
             $value = preg_replace('/[^a-z0-9]+/', '_', $value);
@@ -74,7 +89,7 @@ class EmployeeImport implements ToCollection, WithHeadingRow, SkipsOnFailure, Sk
 
     public function collection(Collection $rows): void
     {
-        foreach ($rows->filter(fn (Collection $row) => $row->filter()->isNotEmpty()) as $row) {
+        foreach ($rows->filter(fn(Collection $row) => $row->filter()->isNotEmpty())->values() as $index => $row) {
 
             $email = strtolower(trim((string) $this->valueFromRow($row, self::EMAIL_ALIASES)));
 
@@ -148,6 +163,8 @@ class EmployeeImport implements ToCollection, WithHeadingRow, SkipsOnFailure, Sk
 
             $employee->save();
             $this->importedCount++;
+
+            $this->syncPayrollFromRow($employee, $row, $index + 2);
         }
     }
 
@@ -156,7 +173,131 @@ class EmployeeImport implements ToCollection, WithHeadingRow, SkipsOnFailure, Sk
         return [
             'imported' => $this->importedCount,
             'skipped' => $this->skippedCount,
+            'payroll' => [
+                'created' => $this->payrollCreatedCount,
+                'updated' => $this->payrollUpdatedCount,
+                'skipped' => $this->payrollSkippedCount,
+                'errors' => $this->payrollErrors,
+                'payroll_data_detected' => $this->payrollDataDetected,
+            ],
         ];
+    }
+
+    protected function syncPayrollFromRow(Employee $employee, Collection $row, int $rowNumber): void
+    {
+        if (! $this->payrollService || ! $this->rowHasPayrollData($row)) {
+            return;
+        }
+
+        $this->payrollDataDetected = true;
+
+        $period = trim((string) $this->valueFromRow($row, PayrollSlipFormat::IMPORT_ALIASES['period']));
+
+        if ($period === '') {
+            $this->payrollSkippedCount++;
+            $this->payrollErrors[] = "Baris {$rowNumber}: periode payroll kosong.";
+
+            return;
+        }
+
+        [, $created] = $this->createOrUpdatePayroll(
+            $employee,
+            $this->payrollData($row, $period)
+        );
+
+        $created ? $this->payrollCreatedCount++ : $this->payrollUpdatedCount++;
+    }
+
+    protected function createOrUpdatePayroll(Employee $employee, array $data): array
+    {
+        if (method_exists($this->payrollService, 'createOrUpdatePayroll')) {
+            return $this->payrollService->createOrUpdatePayroll($employee, $data);
+        }
+
+        $data = $this->payrollService->normalizePayrollData($data);
+
+        $payroll = Payroll::where('company_id', $employee->company_id)
+            ->where('employee_id', $employee->id)
+            ->where('period', $data['period'])
+            ->first();
+
+        $created = ! $payroll;
+        $payroll ??= new Payroll();
+
+        $payroll->fill([
+            'company_id' => $employee->company_id,
+            'employee_id' => $employee->id,
+            'position_name' => $data['position_name'] ?: $employee->position?->name,
+            'department_name' => $data['department_name'] ?: $employee->department?->name,
+            'period' => $data['period'],
+            'target_work_days' => $data['target_work_days'],
+            'work_days' => $data['work_days'],
+            'overtime_hours' => $data['overtime_hours'],
+            'special_overtime_hours' => $data['special_overtime_hours'],
+            'basic_salary' => $data['basic_salary'],
+            'position_allowance' => $data['position_allowance'],
+            'attendance_allowance' => $data['attendance_allowance'],
+            'safety_incentive' => $data['safety_incentive'],
+            'risk_allowance' => $data['risk_allowance'],
+            'placement_allowance' => $data['placement_allowance'],
+            'golden_shake_hand' => $data['golden_shake_hand'],
+            'tax_allowance' => $data['tax_allowance'],
+            'irregular_income' => $data['irregular_income'],
+            'overtime_pay' => $data['overtime_pay'],
+            'total_income' => $data['total_income'],
+            'bpjamsostek' => $data['bpjamsostek'],
+            'bpjs_health' => $data['bpjs_health'],
+            'attendance_deduction' => $data['attendance_deduction'],
+            'fine' => $data['fine'],
+            'employee_receivable' => $data['employee_receivable'],
+            'pph21_tax_object' => $data['pph21_tax_object'],
+            'total_deduction' => $data['total_deduction'],
+            'take_home_pay' => $data['take_home_pay'],
+            'allowance' => $data['allowance'],
+            'bonus' => $data['bonus'],
+            'overtime' => $data['overtime'],
+            'deduction' => $data['deduction'],
+            'total_salary' => $data['total_salary'],
+            'pdf_path' => null,
+            'email_status' => 'pending',
+            'email_error' => null,
+            'email_sent_at' => null,
+        ]);
+
+        $payroll->save();
+        $payroll->refresh();
+
+        return [$payroll, $created];
+    }
+
+    protected function rowHasPayrollData(Collection $row): bool
+    {
+        foreach (PayrollSlipFormat::IMPORT_ALIASES as $aliases) {
+            $value = $this->valueFromRow($row, $aliases);
+
+            if ($value !== null && trim((string) $value) !== '') {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    protected function payrollData(Collection $row, string $period): array
+    {
+        $data = [
+            'position_name' => $this->textValueFromRow($row, self::POSITION_ALIASES),
+            'department_name' => $this->textValueFromRow($row, self::DEPARTMENT_ALIASES),
+            'period' => $period,
+        ];
+
+        foreach (PayrollSlipFormat::NUMERIC_FIELDS as $field) {
+            $data[$field] = $this->numberValue(
+                $this->valueFromRow($row, PayrollSlipFormat::IMPORT_ALIASES[$field] ?? [])
+            );
+        }
+
+        return $data;
     }
 
     protected function department(string $name): Department
@@ -178,6 +319,20 @@ class EmployeeImport implements ToCollection, WithHeadingRow, SkipsOnFailure, Sk
         foreach ($aliases as $alias) {
             if ($row->has($alias) && $row[$alias] !== null) {
                 return $row[$alias];
+            }
+        }
+
+        return null;
+    }
+
+    protected function textValueFromRow(Collection $row, array $aliases): ?string
+    {
+        foreach ($aliases as $alias) {
+            if ($row->has($alias)) {
+                $value = trim((string) ($row[$alias] ?? ''));
+                $value = preg_replace('/\s+/', ' ', $value);
+
+                return $value !== '' ? $value : null;
             }
         }
 
