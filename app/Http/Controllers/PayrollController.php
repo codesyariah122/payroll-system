@@ -256,14 +256,7 @@ class PayrollController extends Controller
 
             $baseQuery = Payroll::with('employee')
                 ->where('company_id', $companyId)
-                ->whereIn('id', $ids)
-                ->where(function ($q) {
-                    $q->whereNull('email_status')
-                        ->orWhereIn('email_status', [
-                            'pending',
-                            'failed',
-                        ]);
-                });
+                ->whereIn('id', $ids);
         }
 
         $skippedZeroCount = (clone $baseQuery)
