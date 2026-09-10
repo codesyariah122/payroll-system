@@ -10,7 +10,6 @@ use App\Models\Department;
 use App\Models\Employee;
 use App\Models\Position;
 use App\Models\User;
-use App\Services\PayrollService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Hash;
@@ -60,34 +59,24 @@ class EmployeeController extends Controller
         return view('admin.employees.import');
     }
 
-    public function importStore(EmployeeImportRequest $request, PayrollService $payrollService)
+    public function importStore(EmployeeImportRequest $request)
     {
-        $import = new EmployeeImport($request->user()->company, $payrollService);
+        // Master karyawan dan transaksi payroll sengaja dipisahkan. Dengan begitu
+        // perubahan data karyawan tidak pernah mengubah slip periode yang sudah ada.
+        $import = new EmployeeImport($request->user()->company);
 
         DB::transaction(function () use ($import, $request) {
             Excel::import($import, $request->file('file'));
         });
 
         $summary = $import->summary();
-        $payrollSummary = $summary['payroll'];
-
         $message = "Data karyawan berhasil diimpor: {$summary['imported']} data dibuat/diperbarui.";
 
         if ($summary['skipped'] > 0) {
             $message .= " {$summary['skipped']} baris dilewati karena email kosong.";
         }
 
-        if ($payrollSummary['created'] > 0 || $payrollSummary['updated'] > 0) {
-            $message .= " Payroll otomatis diproses: {$payrollSummary['created']} dibuat, {$payrollSummary['updated']} diperbarui.";
-
-            if ($payrollSummary['skipped'] > 0) {
-                $message .= " {$payrollSummary['skipped']} payroll dilewati karena email tidak cocok/kosong.";
-            }
-        } elseif ($payrollSummary['payroll_data_detected'] && ! empty($payrollSummary['errors'])) {
-            $message .= ' Payroll belum dibuat untuk sebagian baris: ' . implode(' ', array_slice($payrollSummary['errors'], 0, 3));
-        } elseif (! $payrollSummary['payroll_data_detected']) {
-            $message .= ' Tidak ada payroll otomatis karena file belum memiliki kolom periode/gaji payroll.';
-        }
+        $message .= ' Untuk membuat slip, gunakan menu Import Payroll dan pilih file payroll periode tersebut.';
 
         return redirect()->route('admin.employees.index')
             ->with('status', $message);

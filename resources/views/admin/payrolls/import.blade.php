@@ -15,7 +15,8 @@
                             <h1 class="mt-3 text-2xl font-semibold text-slate-900 dark:text-white">Unggah file Excel
                                 payroll Anda</h1>
                             <p class="mt-2 text-sm text-slate-500 dark:text-slate-400">Gunakan format file Excel yang
-                                sesuai agar data payroll dapat diproses dengan cepat dan aman.</p>
+                                sesuai agar data payroll dapat diproses dengan cepat dan aman. Import ini hanya membuat
+                                data untuk periode yang ada di file; periode sebelumnya tidak dihapus.</p>
                         </div>
 
                         <div
@@ -28,6 +29,7 @@
                             <p class="mt-4 text-sm text-slate-500 dark:text-slate-400">Jika header penting seperti
                                 Email, Bulan, Target Hari Kerja, Hari Kerja, Gaji Pokok, atau Total Gaji Bersih tidak
                                 terbaca, import akan dibatalkan agar slip tidak terlanjur dibuat dengan angka kosong.
+                                Mengimpor ulang periode yang sama akan memperbarui periode itu saja.
                             </p>
                             <p class="mt-4 text-sm text-slate-500 dark:text-slate-400">Sistem mencocokkan karyawan dari
                                 kolom Email. Jika memakai format lama, kolom NIP masih didukung sebagai cadangan.</p>

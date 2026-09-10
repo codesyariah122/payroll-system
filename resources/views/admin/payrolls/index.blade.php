@@ -65,12 +65,36 @@
                         <div class="flex flex-col gap-3 lg:flex-row lg:items-center">
 
                             {{-- SEARCH FORM --}}
-                            <form method="GET" action="{{ route('admin.payrolls.index') }}"
-                                class="flex items-center gap-2">
+                            <form id="payroll-filter-form" method="GET" action="{{ route('admin.payrolls.index') }}"
+                                class="flex flex-wrap items-center gap-2">
+
+                                <div class="relative min-w-[230px]">
+                                    <svg xmlns="http://www.w3.org/2000/svg"
+                                        class="pointer-events-none absolute left-4 top-1/2 h-5 w-5 -translate-y-1/2 text-violet-300"
+                                        fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.8"
+                                            d="M8 7V3m8 4V3M4 11h16M5 5h14a1 1 0 011 1v13a1 1 0 01-1 1H5a1 1 0 01-1-1V6a1 1 0 011-1z" />
+                                    </svg>
+                                    <select name="period" onchange="this.form.submit()"
+                                        aria-label="Filter periode payroll"
+                                        class="w-full appearance-none rounded-2xl border border-violet-500/25 bg-gradient-to-r from-violet-500/10 to-indigo-500/5 py-3 pl-11 pr-11 text-sm font-semibold text-violet-100 shadow-lg shadow-violet-950/20 transition hover:border-violet-400/50 focus:border-violet-400 focus:outline-none focus:ring-2 focus:ring-violet-500/20">
+                                        <option value="">Semua periode</option>
+                                        @foreach ($periods as $availablePeriod)
+                                            <option value="{{ $availablePeriod }}" @selected($period === $availablePeriod)>
+                                                {{ $availablePeriod }}
+                                            </option>
+                                        @endforeach
+                                    </select>
+                                    <svg xmlns="http://www.w3.org/2000/svg"
+                                        class="pointer-events-none absolute right-4 top-1/2 h-4 w-4 -translate-y-1/2 text-violet-300"
+                                        fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="m6 9 6 6 6-6" />
+                                    </svg>
+                                </div>
 
                                 <div class="relative">
 
-                                    <input type="text" name="search" value="{{ request('search') }}"
+                                    <input id="payroll-search" type="text" name="search" value="{{ request('search') }}"
                                         placeholder="Cari nama, NIP, periode, status email..."
                                         class="w-full lg:w-80 rounded-2xl border border-white/10 bg-slate-950/50 px-4 py-3 pl-11 text-sm text-white placeholder:text-slate-500 focus:border-indigo-500 focus:outline-none focus:ring-2 focus:ring-indigo-500/20">
 
@@ -85,13 +109,6 @@
 
                                 </div>
 
-                                <button type="submit"
-                                    class="rounded-2xl border border-indigo-500/20 bg-indigo-500/10 px-4 py-3 text-sm font-semibold text-indigo-300 transition hover:bg-indigo-500/20 hover:text-white">
-
-                                    Search
-
-                                </button>
-
                             </form>
 
                         </div>
@@ -99,18 +116,40 @@
                     </div>
 
                     <div class="mb-6 flex flex-wrap items-center gap-3">
-                        <form action="{{ route('admin.payrolls.destroy-all') }}" method="POST" data-confirm
-                            data-confirm-title="Hapus semua payroll?"
-                            data-confirm-text="Semua data payroll, PDF slip gaji, dan antrean email payroll akan dihapus permanen."
-                            data-confirm-button="Ya, hapus semua" data-confirm-cancel="Batal">
+                        <form action="{{ route('admin.payrolls.destroy-all') }}" method="POST"
+                            class="flex flex-wrap items-center gap-3" data-confirm
+                            data-confirm-title="Hapus payroll satu periode?"
+                            data-confirm-text="Hanya payroll dan PDF pada periode yang dipilih yang akan dihapus. Riwayat periode lain tetap aman."
+                            data-confirm-button="Ya, hapus periode" data-confirm-cancel="Batal">
 
                             @csrf
                             @method('DELETE')
 
-                            <button type="submit"
+                            <div class="relative min-w-[280px]">
+                                <svg xmlns="http://www.w3.org/2000/svg"
+                                    class="pointer-events-none absolute left-4 top-1/2 h-5 w-5 -translate-y-1/2 text-rose-300"
+                                    fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.8"
+                                        d="M8 7V3m8 4V3M4 11h16M5 5h14a1 1 0 011 1v13a1 1 0 01-1 1H5a1 1 0 01-1-1V6a1 1 0 011-1z" />
+                                </svg>
+                                <select name="period" required aria-label="Pilih periode payroll yang akan dihapus"
+                                    class="w-full appearance-none rounded-2xl border border-rose-500/25 bg-gradient-to-r from-rose-500/10 to-transparent py-3 pl-11 pr-11 text-sm font-semibold text-rose-100 transition hover:border-rose-400/50 focus:border-rose-400 focus:outline-none focus:ring-2 focus:ring-rose-500/20">
+                                    <option value="" disabled selected>Pilih periode yang akan dihapus</option>
+                                    @foreach ($periods as $availablePeriod)
+                                        <option value="{{ $availablePeriod }}">{{ $availablePeriod }}</option>
+                                    @endforeach
+                                </select>
+                                <svg xmlns="http://www.w3.org/2000/svg"
+                                    class="pointer-events-none absolute right-4 top-1/2 h-4 w-4 -translate-y-1/2 text-rose-300"
+                                    fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="m6 9 6 6 6-6" />
+                                </svg>
+                            </div>
+
+                            <button type="submit" @disabled($periods->isEmpty())
                                 class="inline-flex items-center gap-2 rounded-2xl border border-rose-500/20 bg-rose-500/10 px-4 py-3 text-sm font-semibold text-rose-300 transition hover:bg-rose-500/20 hover:text-white">
 
-                                Hapus Semua Payroll
+                                Hapus Periode
 
                             </button>
 
@@ -421,6 +460,18 @@
     </div>
 
     <script>
+        const payrollFilterForm = document.getElementById('payroll-filter-form');
+        const payrollSearch = document.getElementById('payroll-search');
+        let payrollSearchTimer;
+
+        payrollSearch.addEventListener('input', function() {
+            clearTimeout(payrollSearchTimer);
+
+            payrollSearchTimer = setTimeout(() => {
+                payrollFilterForm.submit();
+            }, 450);
+        });
+
         const selectAll =
             document.getElementById('select-all');
 

@@ -99,6 +99,14 @@ class EmployeeImport implements ToCollection, WithHeadingRow, SkipsOnFailure, Sk
                 continue;
             }
 
+            // Hindari memasukkan alamat yang pasti akan menghasilkan bounce saat
+            // slip payroll dikirim dari mail server hosting.
+            if (! filter_var($email, FILTER_VALIDATE_EMAIL)) {
+                $this->skippedCount++;
+
+                continue;
+            }
+
             if (Employee::where('email', $email)->where('company_id', '!=', $this->company->id)->exists()) {
                 $this->skippedCount++;
 

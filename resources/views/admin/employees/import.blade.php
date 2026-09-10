@@ -4,7 +4,7 @@
             <div>
                 <h2 class="font-semibold text-xl text-gray-800 dark:text-gray-200 leading-tight">Import Karyawan</h2>
                 <p class="text-sm text-gray-600 dark:text-gray-400 mt-1">Unggah file Excel untuk membuat atau memperbarui
-                    data karyawan. Jika kolom payroll tersedia, payroll ikut dibuat otomatis.</p>
+                    data karyawan. Payroll diproses terpisah agar riwayat slip gaji tetap aman.</p>
             </div>
             <a href="{{ route('admin.employees.index') }}"
                 class="inline-flex items-center rounded-md border border-slate-300 bg-white px-4 py-2 text-sm font-semibold text-slate-700 hover:bg-slate-50 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-200 dark:hover:bg-slate-900">Kembali</a>
@@ -23,17 +23,15 @@
                             <h1 class="mt-3 text-2xl font-semibold text-slate-900 dark:text-white">Unggah file Excel
                                 dengan data karyawan</h1>
                             <p class="mt-2 text-sm text-slate-500 dark:text-slate-400">Gunakan satu file Excel untuk
-                                menyimpan karyawan. Jika file berisi kolom payroll lengkap, sistem juga membuat data
-                                payroll dari baris yang sama.</p>
+                            menyimpan atau memperbarui master karyawan. Kolom payroll pada file ini akan diabaikan.</p>
                         </div>
 
                         <div
                             class="rounded-3xl border border-emerald-500/20 bg-emerald-500/10 p-5 text-sm text-emerald-100">
-                            <p class="font-semibold text-emerald-200">Import sekali jalan</p>
-                            <p class="mt-2 leading-6 text-emerald-100/80">File payroll lengkap seperti Bulan, Target HK,
-                                HK, Gaji Pokok, dan THP/Gaji Bersih akan otomatis membuat atau memperbarui payroll
-                                setelah data karyawan disimpan. Jika kolom payroll tidak ada, hanya data karyawan yang
-                                diproses.</p>
+                            <p class="font-semibold text-emerald-200">Master karyawan saja</p>
+                            <p class="mt-2 leading-6 text-emerald-100/80">Gunakan halaman ini saat ada karyawan baru
+                                atau perubahan profil karyawan. Untuk gaji bulanan, gunakan menu <strong>Import Payroll</strong>.
+                                Riwayat payroll bulan sebelumnya tidak akan disentuh.</p>
                         </div>
 
                         <div

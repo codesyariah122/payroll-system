@@ -10,7 +10,9 @@
                 Anda.</p>
             <div style="background: #f1f5f9; border-radius: 12px; padding: 16px; margin-top: 20px;">
                 <p style="margin: 0; color: #0f172a;"><strong>Nama:</strong> {{ $payroll->employee->name }}</p>
-                {{-- <p style="margin: 0; color: #0f172a;"><strong>NIP:</strong> {{ $payroll->employee->nip }}</p> --}}
+                <p style="margin: 0; color: #0f172a;"><strong>NIP:</strong> {{ $payroll->employee->nip }}</p>
+                <p style="margin: 0; color: #0f172a;"><strong>Jabatan:</strong> {{ $payroll->position_name ?: $payroll->employee->position?->name ?: '-' }}</p>
+                <p style="margin: 0; color: #0f172a;"><strong>Departemen:</strong> {{ $payroll->department_name ?: $payroll->employee->department?->name ?: '-' }}</p>
                 <p style="margin: 0; color: #0f172a;"><strong>Periode:</strong> {{ $payroll->period }}</p>
             </div>
             <p style="color: #475569; line-height: 1.7; margin-top: 20px;">Slip gaji bersifat rahasia dan hanya untuk

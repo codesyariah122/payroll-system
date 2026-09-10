@@ -16,6 +16,10 @@ class PayrollSlipMail extends Mailable
 
     public function build()
     {
+        if (! $this->payroll->pdf_path || ! Storage::disk('local')->exists($this->payroll->pdf_path)) {
+            throw new \RuntimeException('PDF slip payroll tidak ditemukan; email tidak dikirim.');
+        }
+
         $pdfPath = Storage::disk('local')->path($this->payroll->pdf_path);
 
         return $this->subject("Slip Gaji {$this->payroll->period}")

@@ -21,6 +21,7 @@ class PayrollController extends Controller
     public function index(Request $request)
     {
         $search = $request->search;
+        $period = $request->string('period')->trim()->toString();
         $companyId = $request->user()->company_id;
 
         $payrolls = Payroll::with([
@@ -28,6 +29,7 @@ class PayrollController extends Controller
             'employee.position'
         ])
             ->where('company_id', $companyId)
+            ->when($period, fn ($query) => $query->where('period', $period))
             ->when($search, function ($query) use ($search) {
 
                 $query->where(function ($q) use ($search) {
@@ -56,10 +58,13 @@ class PayrollController extends Controller
             ->paginate(15)
             ->withQueryString();
 
-        return view('admin.payrolls.index', compact(
-            'payrolls',
-            'search'
-        ));
+        $periods = Payroll::where('company_id', $companyId)
+            ->select('period')
+            ->distinct()
+            ->orderByDesc('period')
+            ->pluck('period');
+
+        return view('admin.payrolls.index', compact('payrolls', 'search', 'period', 'periods'));
     }
 
     public function create(Request $request)
@@ -446,23 +451,34 @@ class PayrollController extends Controller
     {
         try {
             $companyId = $request->user()->company_id;
-            $payrollCount = Payroll::where('company_id', $companyId)->count();
+            $data = $request->validate(['period' => ['required', 'string', 'max:255']]);
+            $payrolls = Payroll::where('company_id', $companyId)
+                ->where('period', $data['period'])
+                ->get(['id', 'pdf_path']);
+            $payrollCount = $payrolls->count();
+
+            if ($payrollCount === 0) {
+                return redirect()->route('admin.payrolls.index')
+                    ->with('error', 'Periode payroll tidak ditemukan.');
+            }
 
             DB::beginTransaction();
 
             $deletedJobs = 0;
 
-            Payroll::where('company_id', $companyId)->delete();
+            Payroll::whereIn('id', $payrolls->pluck('id'))->delete();
 
             DB::commit();
 
-            Storage::disk('local')->deleteDirectory("payroll-slips/company-{$companyId}");
+            foreach ($payrolls->pluck('pdf_path')->filter() as $pdfPath) {
+                Storage::disk('local')->delete($pdfPath);
+            }
 
             return redirect()
                 ->route('admin.payrolls.index')
                 ->with(
                     'status',
-                    "Semua payroll berhasil dihapus ({$payrollCount} data, {$deletedJobs} antrean payroll dibatalkan)."
+                    "Payroll periode {$data['period']} berhasil dihapus ({$payrollCount} data). Riwayat periode lain tetap tersimpan."
                 );
         } catch (\Throwable $e) {
 

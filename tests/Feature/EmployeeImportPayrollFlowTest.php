@@ -15,10 +15,10 @@ class EmployeeImportPayrollFlowTest extends TestCase
 {
     use RefreshDatabase;
 
-    public function test_employee_import_creates_payroll_from_the_same_row(): void
+    public function test_employee_import_only_updates_master_employee_data(): void
     {
         $company = Company::create(['name' => 'HC Group']);
-        $import = new EmployeeImport($company, app(PayrollService::class));
+        $import = new EmployeeImport($company);
 
         $import->collection(collect([
             new Collection([
@@ -41,25 +41,15 @@ class EmployeeImportPayrollFlowTest extends TestCase
             ->where('email', 'tia@example.com')
             ->first();
 
-        $payroll = Payroll::where('company_id', $company->id)
-            ->where('employee_id', $employee?->id)
-            ->where('period', '21 Juli - 20 Agustus 2026')
-            ->first();
-
-        $summary = $import->summary();
-
         $this->assertNotNull($employee);
         $this->assertNull($employee->user_id);
-        $this->assertNotNull($payroll);
-        $this->assertSame('4150000.00', $payroll->take_home_pay);
-        $this->assertSame(1, $summary['payroll']['created']);
-        $this->assertSame(0, $summary['payroll']['updated']);
+        $this->assertSame(0, Payroll::count());
     }
 
-    public function test_employee_import_updates_existing_payroll_for_same_employee_and_period(): void
+    public function test_employee_import_never_changes_existing_payroll(): void
     {
         $company = Company::create(['name' => 'HC Group']);
-        $import = new EmployeeImport($company, app(PayrollService::class));
+        $import = new EmployeeImport($company);
 
         $row = fn (int $salary) => new Collection([
             'nama' => 'Tia Nurul Safitri',
@@ -76,8 +66,37 @@ class EmployeeImportPayrollFlowTest extends TestCase
         $import->collection(collect([$row(3500000)]));
         $import->collection(collect([$row(3750000)]));
 
-        $this->assertSame(1, Payroll::count());
-        $this->assertSame('3750000.00', Payroll::first()->take_home_pay);
-        $this->assertSame(1, $import->summary()['payroll']['updated']);
+        $this->assertSame(0, Payroll::count());
+    }
+
+    public function test_payroll_import_service_preserves_other_periods(): void
+    {
+        $company = Company::create(['name' => 'HC Group']);
+        $employeeImport = new EmployeeImport($company);
+        $employeeImport->collection(collect([
+            new Collection([
+                'nama' => 'Tia Nurul Safitri',
+                'email' => 'tia@example.com',
+                'departemen' => 'Factory',
+                'jabatan' => 'Operator',
+            ]),
+        ]));
+
+        $employee = Employee::where('company_id', $company->id)->firstOrFail();
+        $service = app(PayrollService::class);
+
+        $service->createOrUpdatePayroll($employee, [
+            'period' => 'Juli 2026', 'basic_salary' => 3000000, 'take_home_pay' => 3000000,
+        ]);
+        $service->createOrUpdatePayroll($employee, [
+            'period' => 'Agustus 2026', 'basic_salary' => 3200000, 'take_home_pay' => 3200000,
+        ]);
+        $service->createOrUpdatePayroll($employee, [
+            'period' => 'Agustus 2026', 'basic_salary' => 3250000, 'take_home_pay' => 3250000,
+        ]);
+
+        $this->assertSame(2, Payroll::count());
+        $this->assertSame('3000000.00', Payroll::where('period', 'Juli 2026')->value('take_home_pay'));
+        $this->assertSame('3250000.00', Payroll::where('period', 'Agustus 2026')->value('take_home_pay'));
     }
 }

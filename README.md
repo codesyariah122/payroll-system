@@ -285,3 +285,13 @@ $app->handleRequest(Request::capture());
 ```
 php artisan db:seed --class=AdminCompanySeeder
 ``` 
+
+### Payroll bulanan dan email hosting
+
+- **Import Karyawan** hanya membuat atau memperbarui master karyawan. Payroll tidak dibuat dari halaman ini.
+- **Import Payroll** membuat data berdasarkan karyawan dan `Bulan/Periode`. Import ulang periode yang sama hanya memperbarui periode itu; periode lain tetap tersimpan.
+- Penghapusan payroll harus memilih satu periode. Riwayat bulan lain dan PDF-nya tidak ikut terhapus.
+
+Untuk mail server hosting, isi konfigurasi SMTP di `.env` memakai contoh pada `.env.example`, lalu jalankan `php artisan optimize:clear`. `MAIL_FROM_ADDRESS` harus merupakan mailbox yang benar-benar dibuat di hosting, dan domainnya sebaiknya memiliki SPF/DKIM aktif. Email slip memuat identitas karyawan dan periode, serta melampirkan PDF payroll.
+
+Pengiriman diproses melalui queue. Di shared hosting, jalankan worker terus-menerus (Supervisor) atau cron setiap menit: `php artisan queue:work --stop-when-empty --tries=3`.
