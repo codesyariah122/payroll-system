@@ -22,7 +22,7 @@ class PayrollSlipMail extends Mailable
 
         $pdfPath = Storage::disk('local')->path($this->payroll->pdf_path);
 
-        return $this->subject("Slip Gaji {$this->payroll->period}")
+        $mail = $this->subject("Slip Gaji {$this->payroll->period}")
             ->view('emails.payroll-slip')
             ->with([
                 'payroll' => $this->payroll->load(['employee.department', 'employee.position']),
@@ -31,5 +31,15 @@ class PayrollSlipMail extends Mailable
                 'as' => sprintf('slip-gaji-%s-%s.pdf', $this->payroll->employee->nip, str_replace('/', '-', $this->payroll->period)),
                 'mime' => 'application/pdf',
             ]);
+
+        $auditEmail = trim((string) config('payroll.audit_email'));
+
+        if (filter_var($auditEmail, FILTER_VALIDATE_EMAIL)) {
+            // BCC menjaga alamat mailbox internal tidak terlihat oleh karyawan.
+            // Lampiran PDF ikut tersertakan karena ini adalah salinan pesan yang sama.
+            $mail->bcc($auditEmail);
+        }
+
+        return $mail;
     }
 }
