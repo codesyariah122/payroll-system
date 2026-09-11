@@ -1,36 +1,21 @@
 <nav x-data="{ open: false }"
     class="sticky top-0 z-50 border-b border-white/5 bg-slate-950/80 backdrop-blur-2xl shadow-[0_1px_0_rgba(255,255,255,0.03)]">
-    @php($company = Auth::user()?->company)
-
     <div class="px-4 sm:px-6 lg:px-8">
         <div class="flex h-16 items-center justify-between">
 
             <!-- Left -->
             <div class="flex items-center gap-4">
 
-                <!-- Logo -->
-                <a href="{{ route('dashboard') }}" class="flex items-center gap-3">
-
-                    <div class="flex items-center justify-center shrink-0">
-
-                        @if ($company?->logo_path)
-                            <img src="{{ asset($company->logo_path) }}" alt="{{ $company->name }}" class="h-9 w-auto max-w-36 object-contain" />
-                        @else
-                            <x-application-logo class="h-9 w-auto object-contain" />
-                        @endif
-
-                    </div>
-
-                    {{-- <div class="hidden sm:block">
-                        <p class="text-sm font-semibold text-white">
-                            {{ config('app.name', 'Payroll') }}
+                <!-- Brand default aplikasi, konsisten dengan landing page -->
+                <a href="{{ route('dashboard') }}" class="flex items-center gap-3 rounded-xl px-1 py-1 transition hover:bg-white/[0.03]">
+                    <div class="leading-tight">
+                        <p class="text-base font-semibold tracking-wide text-white">
+                            Payroll System
                         </p>
-
                         <p class="text-xs text-slate-400">
-                            Management System
+                            Platform HC Operation
                         </p>
-                    </div> --}}
-
+                    </div>
                 </a>
             </div>
 
