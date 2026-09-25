@@ -6,6 +6,7 @@ use App\Exports\EmployeesExport;
 use App\Http\Requests\EmployeeImportRequest;
 use App\Http\Requests\EmployeeRequest;
 use App\Imports\EmployeeImport;
+use App\Services\PayrollService;
 use App\Models\Department;
 use App\Models\Employee;
 use App\Models\Position;
@@ -59,11 +60,9 @@ class EmployeeController extends Controller
         return view('admin.employees.import');
     }
 
-    public function importStore(EmployeeImportRequest $request)
+    public function importStore(EmployeeImportRequest $request, PayrollService $payrollService)
     {
-        // Master karyawan dan transaksi payroll sengaja dipisahkan. Dengan begitu
-        // perubahan data karyawan tidak pernah mengubah slip periode yang sudah ada.
-        $import = new EmployeeImport($request->user()->company);
+        $import = new EmployeeImport($request->user()->company, $payrollService);
 
         DB::transaction(function () use ($import, $request) {
             Excel::import($import, $request->file('file'));
@@ -76,7 +75,13 @@ class EmployeeController extends Controller
             $message .= " {$summary['skipped']} baris dilewati karena email kosong.";
         }
 
-        $message .= ' Untuk membuat slip, gunakan menu Import Payroll dan pilih file payroll periode tersebut.';
+        if (($summary['payroll']['payroll_data_detected'] ?? false) === true) {
+            $message .= " Payroll: {$summary['payroll']['created']} data dibuat, {$summary['payroll']['updated']} data diperbarui.";
+
+            if (($summary['payroll']['skipped'] ?? 0) > 0) {
+                $message .= " {$summary['payroll']['skipped']} payroll dilewati.";
+            }
+        }
 
         return redirect()->route('admin.employees.index')
             ->with('status', $message);

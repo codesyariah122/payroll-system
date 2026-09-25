@@ -29,12 +29,12 @@
 
                 </a>
 
-                <a href="{{ route('admin.payrolls.import') }}"
+                {{-- <a href="{{ route('admin.payrolls.import') }}"
                     class="inline-flex items-center gap-2 rounded-2xl border border-cyan-500/20 bg-cyan-500/10 px-5 py-3 text-sm font-semibold text-cyan-300 shadow-lg shadow-cyan-500/10 transition-all duration-200 hover:-translate-y-0.5 hover:bg-cyan-500/20 hover:text-white">
 
                     Import Excel
 
-                </a>
+                </a> --}}
 
             </div>
 
@@ -88,13 +88,15 @@
                                     <svg xmlns="http://www.w3.org/2000/svg"
                                         class="pointer-events-none absolute right-4 top-1/2 h-4 w-4 -translate-y-1/2 text-violet-300"
                                         fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="m6 9 6 6 6-6" />
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                                            d="m6 9 6 6 6-6" />
                                     </svg>
                                 </div>
 
                                 <div class="relative">
 
-                                    <input id="payroll-search" type="text" name="search" value="{{ request('search') }}"
+                                    <input id="payroll-search" type="text" name="search"
+                                        value="{{ request('search') }}"
                                         placeholder="Cari nama, NIP, periode, status email..."
                                         class="w-full lg:w-80 rounded-2xl border border-white/10 bg-slate-950/50 px-4 py-3 pl-11 text-sm text-white placeholder:text-slate-500 focus:border-indigo-500 focus:outline-none focus:ring-2 focus:ring-indigo-500/20">
 
@@ -142,7 +144,8 @@
                                 <svg xmlns="http://www.w3.org/2000/svg"
                                     class="pointer-events-none absolute right-4 top-1/2 h-4 w-4 -translate-y-1/2 text-rose-300"
                                     fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="m6 9 6 6 6-6" />
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                                        d="m6 9 6 6 6-6" />
                                 </svg>
                             </div>
 
@@ -278,7 +281,8 @@
                                             {{-- CHECKBOX --}}
                                             <td class="px-4 py-4">
 
-                                                <input type="checkbox" name="payroll_ids[]" value="{{ $payroll->id }}"
+                                                <input type="checkbox" name="payroll_ids[]"
+                                                    value="{{ $payroll->id }}"
                                                     class="payroll-checkbox h-5 w-5 rounded-lg border-white/10 bg-slate-800 text-indigo-500 focus:ring-indigo-500" />
 
                                             </td>
