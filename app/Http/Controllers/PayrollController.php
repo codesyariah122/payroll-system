@@ -29,7 +29,7 @@ class PayrollController extends Controller
             'employee.position'
         ])
             ->where('company_id', $companyId)
-            ->when($period, fn ($query) => $query->where('period', $period))
+            ->when($period, fn($query) => $query->where('period', $period))
             ->when($search, function ($query) use ($search) {
 
                 $query->where(function ($q) use ($search) {
@@ -238,10 +238,17 @@ class PayrollController extends Controller
     {
         $companyId = $request->user()->company_id;
 
+        $data = $request->validate([
+            'period' => ['required', 'string', 'max:255'],
+        ]);
+
+        $period = trim($data['period']);
+
         if ($request->boolean('send_all')) {
 
             $baseQuery = Payroll::with('employee')
                 ->where('company_id', $companyId)
+                ->where('period', $period)
                 ->where(function ($q) {
                     $q->whereNull('email_status')
                         ->orWhereIn('email_status', [
@@ -254,14 +261,22 @@ class PayrollController extends Controller
             $ids = $request->input('payroll_ids', []);
 
             if (empty($ids)) {
-
-                return redirect()->route('admin.payrolls.index')
+                return redirect()
+                    ->route('admin.payrolls.index', ['period' => $period])
                     ->with('status', 'Silakan pilih minimal satu payroll untuk dikirim.');
             }
 
             $baseQuery = Payroll::with('employee')
                 ->where('company_id', $companyId)
-                ->whereIn('id', $ids);
+                ->where('period', $period)
+                ->whereIn('id', $ids)
+                ->where(function ($q) {
+                    $q->whereNull('email_status')
+                        ->orWhereIn('email_status', [
+                            'pending',
+                            'failed',
+                        ]);
+                });
         }
 
         $skippedZeroCount = (clone $baseQuery)
@@ -326,7 +341,10 @@ class PayrollController extends Controller
                 $message .= " {$skippedZeroCount} payroll nominal 0 dilewati.";
             }
 
-            return redirect()->route('admin.payrolls.index')
+            return redirect()
+                ->route('admin.payrolls.index', [
+                    'period' => $period,
+                ])
                 ->with('status', $message);
         }
 
@@ -359,13 +377,16 @@ class PayrollController extends Controller
             }
         });
 
-        $message = "Email slip gaji untuk {$payrollCount} payroll telah dimasukkan ke antrean.";
+        $message = "Email slip gaji untuk {$payrollCount} payroll periode {$period} telah dimasukkan ke antrean.";
 
         if ($skippedZeroCount > 0) {
             $message .= " {$skippedZeroCount} payroll nominal 0 dilewati.";
         }
 
-        return redirect()->route('admin.payrolls.index')
+        return redirect()
+            ->route('admin.payrolls.index', [
+                'period' => $period,
+            ])
             ->with('status', $message);
     }
 

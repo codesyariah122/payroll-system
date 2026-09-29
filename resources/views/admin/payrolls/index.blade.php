@@ -164,21 +164,27 @@
 
                         @csrf
 
+                        {{-- WAJIB membawa periode yang sedang aktif --}}
+                        <input type="hidden" name="period" value="{{ $period }}">
+
                         <div class="mb-6 flex flex-wrap items-center gap-3">
 
-                            <button type="submit" id="send-selected"
-                                class="inline-flex items-center gap-2 rounded-2xl border border-emerald-500/20 bg-emerald-500/10 px-4 py-3 text-sm font-semibold text-emerald-300 transition hover:bg-emerald-500/20 hover:text-white">
-
+                            <button type="submit" id="send-selected" @disabled(empty($period))
+                                class="inline-flex items-center gap-2 rounded-2xl border border-emerald-500/20 bg-emerald-500/10 px-4 py-3 text-sm font-semibold text-emerald-300 transition hover:bg-emerald-500/20 hover:text-white disabled:cursor-not-allowed disabled:opacity-40">
                                 Kirim Terpilih
-
                             </button>
 
                             <button type="submit" name="send_all" value="1" id="send-all"
-                                class="inline-flex items-center gap-2 rounded-2xl border border-cyan-500/20 bg-cyan-500/10 px-4 py-3 text-sm font-semibold text-cyan-300 transition hover:bg-cyan-500/20 hover:text-white">
-
+                                @disabled(empty($period))
+                                class="inline-flex items-center gap-2 rounded-2xl border border-cyan-500/20 bg-cyan-500/10 px-4 py-3 text-sm font-semibold text-cyan-300 transition hover:bg-cyan-500/20 hover:text-white disabled:cursor-not-allowed disabled:opacity-40">
                                 Kirim Semua
-
                             </button>
+
+                            @if (empty($period))
+                                <p class="w-full text-xs mt-16 text-amber-300">
+                                    Pilih periode payroll terlebih dahulu sebelum mengirim email.
+                                </p>
+                            @endif
 
                         </div>
 

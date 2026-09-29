@@ -18,6 +18,15 @@ Route::get('/', function () {
     return view('welcome');
 });
 
+Route::get('/admin/payrolls/check-email-status', function () {
+    $data = \App\Models\Payroll::selectRaw('period, email_status, COUNT(*) as total')
+        ->groupBy('period', 'email_status')
+        ->orderBy('period')
+        ->get();
+
+    return response()->json($data);
+});
+
 Route::get('/admin/payrolls/stop-queue', function () {
 
     // 1. Hentikan worker secara graceful
